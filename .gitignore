@@ -1,0 +1,4 @@
+build/
+
+# vim swap files
+.*.sw*
