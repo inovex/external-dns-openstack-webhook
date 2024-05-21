@@ -7,11 +7,13 @@ import (
 	"sigs.k8s.io/external-dns/provider/webhook/api"
 )
 
-import "external-dns-openstack-webhook/internal/designate"
+import "external-dns-openstack-webhook/internal/designate/provider"
+
+
 
 func main() {
 	epf := endpoint.NewDomainFilter([]string{})
-	dp, err := designate.NewDesignateProvider(epf, false)
+	dp, err := provider.NewDesignateProvider(epf, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
 	}
