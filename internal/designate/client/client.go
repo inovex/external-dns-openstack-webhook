@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -93,12 +92,6 @@ func getAuthSettings() (gophercloud.AuthOptions, error) {
 		return gophercloud.AuthOptions{}, err
 	}
 	opts.AllowReauth = true
-	if !strings.HasSuffix(opts.IdentityEndpoint, "/") {
-		opts.IdentityEndpoint += "/"
-	}
-	if !strings.HasSuffix(opts.IdentityEndpoint, "/v2.0/") && !strings.HasSuffix(opts.IdentityEndpoint, "/v3/") {
-		opts.IdentityEndpoint += "v2.0/"
-	}
 	return opts, nil
 }
 
