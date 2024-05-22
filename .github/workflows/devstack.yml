@@ -1,0 +1,116 @@
+name: devstack
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  external-dns-source-fake:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout external-dns-openstack-webhook
+        uses: actions/checkout@v4
+
+      - name: Checkout kubernetes-sigs/external-dns
+        uses: actions/checkout@v4
+        with:
+          repository: kubernetes-sigs/external-dns
+          path: ./external-dns
+
+      - name: Checkout openstack/devstack
+        uses: actions/checkout@v4
+        with:
+          repository: openstack/devstack
+          ref: 'stable/2024.1'
+          path: ./devstack
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.1'
+          cache-dependency-path: |
+            ./go.sum
+            ./external-dns/go.sum
+
+      - name: Install pip
+        run: python -m pip install --upgrade pip
+
+      - name: go build external-dns-openstack-webhook
+        run: make build
+
+      - name: go build external-dns
+        run: make build
+        working-directory: ./external-dns
+
+      - name: Configure devstack
+        run: |
+          cat <<EOF > local.conf
+          [[local|localrc]]
+          ADMIN_PASSWORD=secret
+          DATABASE_PASSWORD=root
+          RABBIT_PASSWORD=secret
+          SERVICE_PASSWORD=secret
+          LOGFILE=/var/tmp/devstack.log
+          USE_PYTHON3=True
+          INSTALL_TEMPEST=False
+          ENABLED_SERVICES=key,mysql,rabbit
+          ENABLE_HTTPD_MOD_WSGI_SERVICES=True
+          DESIGNATE_BACKEND_DRIVER=bind9
+
+          enable_plugin designate https://opendev.org/openstack/designate stable/2024.1
+          enable_service designate,designate-central,designate-api,designate-zone-manager,designate-mdns,designate-worker,designate-producer
+          EOF
+        working-directory: ./devstack
+        shell: bash
+
+      - name: Run stack.sh
+        run: ./stack.sh
+        working-directory: ./devstack
+
+      - name: Fix Designate
+        run: sudo sed 's/root-helper/root_helper/g' -i /etc/designate/designate.conf
+
+      - name: Restart Designate
+        run: sudo systemctl restart "devstack@designate-*.service"
+
+      - name: Create zones example.com
+        run: |
+          source ./devstack/openrc
+          openstack zone create --email admin@example.com example.com.
+
+      - name: Wait for zone creation
+        run: |
+          source ./devstack/openrc
+          while [ "$(openstack zone list -f csv | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
+
+      - name: Start external-dns-openstack-webhook in background
+        run: |
+          source ./devstack/openrc
+          ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
+
+      - name: Run external-dns
+        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
+        working-directory: ./external-dns
+
+      - name: Show /tmp/external-dns-openstack-webhook.log
+        run: cat /tmp/external-dns-openstack-webhook.log
+
+      - name: Wait for PENDING
+        run: |
+          source ./devstack/openrc
+          while [ "$(openstack zone list -f csv | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
+
+      - name: Show created entries
+        run: |
+          source ./devstack/openrc
+          echo "Zones:"
+          openstack zone list -f value
+          echo "Recordsets:"
+          openstack recordset list all -f value
+
+      - name: Check created entries
+        run: |
+          source ./devstack/openrc
+          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 20 ]; then exit 1; fi
+          if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
