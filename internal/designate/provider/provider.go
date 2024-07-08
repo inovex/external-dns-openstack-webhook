@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/recordsets"
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/zones"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/recordsets"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/zones"
 	log "github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/external-dns/endpoint"
@@ -89,10 +89,10 @@ func canonicalizeDomainName(d string) string {
 }
 
 // returns ZoneID -> ZoneName mapping for zones that are managed by the Designate and match domain filter
-func (p designateProvider) getZones() (map[string]string, error) {
+func (p designateProvider) getZones(ctx context.Context) (map[string]string, error) {
 	result := map[string]string{}
 
-	err := p.client.ForEachZone(
+	err := p.client.ForEachZone(ctx,
 		func(zone *zones.Zone) error {
 			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status != "ACTIVE" {
 				return nil
@@ -132,12 +132,12 @@ func (p designateProvider) getHostZoneID(hostname string, managedZones map[strin
 // Records returns the list of records.
 func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, error) {
 	var result []*endpoint.Endpoint
-	managedZones, err := p.getZones()
+	managedZones, err := p.getZones(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for zoneID := range managedZones {
-		err = p.client.ForEachRecordSet(zoneID,
+		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
 				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
 					return nil
@@ -229,7 +229,7 @@ func addDesignateIDLabelsFromExistingEndpoints(existingEndpoints []*endpoint.End
 
 // ApplyChanges applies a given set of changes in a given zone.
 func (p designateProvider) ApplyChanges(ctx context.Context, changes *plan.Changes) error {
-	managedZones, err := p.getZones()
+	managedZones, err := p.getZones(ctx)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (p designateProvider) ApplyChanges(ctx context.Context, changes *plan.Chang
 	}
 
 	for _, rs := range recordSets {
-		if err2 := p.upsertRecordSet(rs, managedZones); err == nil {
+		if err2 := p.upsertRecordSet(ctx, rs, managedZones); err == nil {
 			err = err2
 		}
 	}
@@ -262,7 +262,7 @@ func (p designateProvider) ApplyChanges(ctx context.Context, changes *plan.Chang
 }
 
 // apply recordset changes by inserting/updating/deleting recordsets
-func (p designateProvider) upsertRecordSet(rs *recordSet, managedZones map[string]string) error {
+func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, managedZones map[string]string) error {
 	if rs.zoneID == "" {
 		var err error
 		rs.zoneID, err = p.getHostZoneID(rs.dnsName, managedZones)
@@ -293,14 +293,14 @@ func (p designateProvider) upsertRecordSet(rs *recordSet, managedZones map[strin
 		if p.dryRun {
 			return nil
 		}
-		_, err := p.client.CreateRecordSet(rs.zoneID, opts)
+		_, err := p.client.CreateRecordSet(ctx, rs.zoneID, opts)
 		return err
 	} else if len(records) == 0 {
 		log.Infof("Deleting records for %s/%s", rs.dnsName, rs.recordType)
 		if p.dryRun {
 			return nil
 		}
-		return p.client.DeleteRecordSet(rs.zoneID, rs.recordSetID)
+		return p.client.DeleteRecordSet(ctx, rs.zoneID, rs.recordSetID)
 	} else {
 		ttl := 0
 		opts := recordsets.UpdateOpts{
@@ -311,6 +311,6 @@ func (p designateProvider) upsertRecordSet(rs *recordSet, managedZones map[strin
 		if p.dryRun {
 			return nil
 		}
-		return p.client.UpdateRecordSet(rs.zoneID, rs.recordSetID, opts)
+		return p.client.UpdateRecordSet(ctx, rs.zoneID, rs.recordSetID, opts)
 	}
 }
