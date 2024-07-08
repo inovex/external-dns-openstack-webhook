@@ -3,7 +3,7 @@ module external-dns-openstack-webhook
 go 1.22.1
 
 require (
-	github.com/gophercloud/gophercloud v1.12.0
+	github.com/gophercloud/gophercloud v1.13.0
 	github.com/sirupsen/logrus v1.9.3
 	sigs.k8s.io/external-dns v0.14.1
 )
