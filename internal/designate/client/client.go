@@ -18,16 +18,17 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/recordsets"
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/zones"
-	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/recordsets"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/zones"
+	"github.com/gophercloud/gophercloud/v2/pagination"
 	log "github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/external-dns/pkg/tlsutils"
@@ -36,19 +37,19 @@ import (
 // interface between provider and OpenStack DNS API
 type DesignateClientInterface interface {
 	// ForEachZone calls handler for each zone managed by the Designate
-	ForEachZone(handler func(zone *zones.Zone) error) error
+	ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error
 
 	// ForEachRecordSet calls handler for each recordset in the given DNS zone
-	ForEachRecordSet(zoneID string, handler func(recordSet *recordsets.RecordSet) error) error
+	ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error
 
 	// CreateRecordSet creates recordset in the given DNS zone
-	CreateRecordSet(zoneID string, opts recordsets.CreateOpts) (string, error)
+	CreateRecordSet(ctx context.Context, zoneID string, opts recordsets.CreateOpts) (string, error)
 
 	// UpdateRecordSet updates recordset in the given DNS zone
-	UpdateRecordSet(zoneID, recordSetID string, opts recordsets.UpdateOpts) error
+	UpdateRecordSet(ctx context.Context, zoneID, recordSetID string, opts recordsets.UpdateOpts) error
 
 	// DeleteRecordSet deletes recordset in the given DNS zone
-	DeleteRecordSet(zoneID, recordSetID string) error
+	DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error
 }
 
 // implementation of the DesignateClientInterface
@@ -126,7 +127,8 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	}
 	authProvider.HTTPClient.Transport = transport
 
-	if err = openstack.Authenticate(authProvider, opts); err != nil {
+	ctx := context.Background()
+	if err = openstack.Authenticate(ctx, authProvider, opts); err != nil {
 		return nil, err
 	}
 
@@ -143,10 +145,10 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 }
 
 // ForEachZone calls handler for each zone managed by the Designate
-func (c designateClient) ForEachZone(handler func(zone *zones.Zone) error) error {
+func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
 	pager := zones.List(c.serviceClient, zones.ListOpts{})
-	return pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+	return pager.EachPage(ctx,
+		func(ctx context.Context, page pagination.Page) (bool, error) {
 			list, err := zones.ExtractZones(page)
 			if err != nil {
 				return false, err
@@ -163,10 +165,10 @@ func (c designateClient) ForEachZone(handler func(zone *zones.Zone) error) error
 }
 
 // ForEachRecordSet calls handler for each recordset in the given DNS zone
-func (c designateClient) ForEachRecordSet(zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
+func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
 	pager := recordsets.ListByZone(c.serviceClient, zoneID, recordsets.ListOpts{})
-	return pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+	return pager.EachPage(ctx,
+		func(ctx context.Context, page pagination.Page) (bool, error) {
 			list, err := recordsets.ExtractRecordSets(page)
 			if err != nil {
 				return false, err
@@ -183,8 +185,8 @@ func (c designateClient) ForEachRecordSet(zoneID string, handler func(recordSet 
 }
 
 // CreateRecordSet creates recordset in the given DNS zone
-func (c designateClient) CreateRecordSet(zoneID string, opts recordsets.CreateOpts) (string, error) {
-	r, err := recordsets.Create(c.serviceClient, zoneID, opts).Extract()
+func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opts recordsets.CreateOpts) (string, error) {
+	r, err := recordsets.Create(ctx, c.serviceClient, zoneID, opts).Extract()
 	if err != nil {
 		return "", err
 	}
@@ -192,12 +194,12 @@ func (c designateClient) CreateRecordSet(zoneID string, opts recordsets.CreateOp
 }
 
 // UpdateRecordSet updates recordset in the given DNS zone
-func (c designateClient) UpdateRecordSet(zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
-	_, err := recordsets.Update(c.serviceClient, zoneID, recordSetID, opts).Extract()
+func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
+	_, err := recordsets.Update(ctx, c.serviceClient, zoneID, recordSetID, opts).Extract()
 	return err
 }
 
 // DeleteRecordSet deletes recordset in the given DNS zone
-func (c designateClient) DeleteRecordSet(zoneID, recordSetID string) error {
-	return recordsets.Delete(c.serviceClient, zoneID, recordSetID).ExtractErr()
+func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error {
+	return recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
 }

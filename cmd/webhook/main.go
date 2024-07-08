@@ -9,8 +9,6 @@ import (
 
 import "external-dns-openstack-webhook/internal/designate/provider"
 
-
-
 func main() {
 	epf := endpoint.NewDomainFilter([]string{})
 	dp, err := provider.NewDesignateProvider(epf, false)
@@ -22,4 +20,3 @@ func main() {
 	log.Printf("Starting server")
 	api.StartHTTPApi(dp, nil, 0, 0, "127.0.0.1:8888")
 }
-

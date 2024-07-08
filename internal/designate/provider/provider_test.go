@@ -28,8 +28,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/recordsets"
-	"github.com/gophercloud/gophercloud/openstack/dns/v2/zones"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/recordsets"
+	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/zones"
 
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
@@ -49,7 +49,7 @@ type fakeDesignateClient struct {
 	}
 }
 
-func (c fakeDesignateClient) AddZone(zone zones.Zone) string {
+func (c fakeDesignateClient) AddZone(ctx context.Context, zone zones.Zone) string {
 	if zone.ID == "" {
 		zone.ID = zone.Name
 	}
@@ -63,7 +63,7 @@ func (c fakeDesignateClient) AddZone(zone zones.Zone) string {
 	return zone.ID
 }
 
-func (c fakeDesignateClient) ForEachZone(handler func(zone *zones.Zone) error) error {
+func (c fakeDesignateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
 	for _, zone := range c.managedZones {
 		if err := handler(zone.zone); err != nil {
 			return err
@@ -72,7 +72,7 @@ func (c fakeDesignateClient) ForEachZone(handler func(zone *zones.Zone) error) e
 	return nil
 }
 
-func (c fakeDesignateClient) ForEachRecordSet(zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
+func (c fakeDesignateClient) ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
 	zone := c.managedZones[zoneID]
 	if zone == nil {
 		return fmt.Errorf("unknown zone %s", zoneID)
@@ -85,7 +85,7 @@ func (c fakeDesignateClient) ForEachRecordSet(zoneID string, handler func(record
 	return nil
 }
 
-func (c fakeDesignateClient) CreateRecordSet(zoneID string, opts recordsets.CreateOpts) (string, error) {
+func (c fakeDesignateClient) CreateRecordSet(ctx context.Context, zoneID string, opts recordsets.CreateOpts) (string, error) {
 	zone := c.managedZones[zoneID]
 	if zone == nil {
 		return "", fmt.Errorf("unknown zone %s", zoneID)
@@ -103,7 +103,7 @@ func (c fakeDesignateClient) CreateRecordSet(zoneID string, opts recordsets.Crea
 	return rs.ID, nil
 }
 
-func (c fakeDesignateClient) UpdateRecordSet(zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
+func (c fakeDesignateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
 	zone := c.managedZones[zoneID]
 	if zone == nil {
 		return fmt.Errorf("unknown zone %s", zoneID)
@@ -121,7 +121,7 @@ func (c fakeDesignateClient) UpdateRecordSet(zoneID, recordSetID string, opts re
 	return nil
 }
 
-func (c fakeDesignateClient) DeleteRecordSet(zoneID, recordSetID string) error {
+func (c fakeDesignateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error {
 	zone := c.managedZones[zoneID]
 	if zone == nil {
 		return fmt.Errorf("unknown zone %s", zoneID)
@@ -198,44 +198,45 @@ func TestNewDesignateProvider(t *testing.T) {
 
 func TestDesignateRecords(t *testing.T) {
 	client := newFakeDesignateClient()
+	ctx := context.TODO()
 
-	zone1ID := client.AddZone(zones.Zone{
+	zone1ID := client.AddZone(ctx, zones.Zone{
 		Name:   "example.com.",
 		Type:   "PRIMARY",
 		Status: "ACTIVE",
 	})
-	rs11ID, _ := client.CreateRecordSet(zone1ID, recordsets.CreateOpts{
+	rs11ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
 		Name:    "www.example.com.",
 		Type:    endpoint.RecordTypeA,
 		Records: []string{"10.1.1.1"},
 	})
-	rs12ID, _ := client.CreateRecordSet(zone1ID, recordsets.CreateOpts{
+	rs12ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
 		Name:    "www.example.com.",
 		Type:    endpoint.RecordTypeTXT,
 		Records: []string{"text1"},
 	})
-	client.CreateRecordSet(zone1ID, recordsets.CreateOpts{
+	client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
 		Name:    "xxx.example.com.",
 		Type:    "SRV",
 		Records: []string{"http://test.com:1234"},
 	})
-	rs14ID, _ := client.CreateRecordSet(zone1ID, recordsets.CreateOpts{
+	rs14ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
 		Name:    "ftp.example.com.",
 		Type:    endpoint.RecordTypeA,
 		Records: []string{"10.1.1.2"},
 	})
 
-	zone2ID := client.AddZone(zones.Zone{
+	zone2ID := client.AddZone(ctx, zones.Zone{
 		Name:   "test.net.",
 		Type:   "PRIMARY",
 		Status: "ACTIVE",
 	})
-	rs21ID, _ := client.CreateRecordSet(zone2ID, recordsets.CreateOpts{
+	rs21ID, _ := client.CreateRecordSet(ctx, zone2ID, recordsets.CreateOpts{
 		Name:    "srv.test.net.",
 		Type:    endpoint.RecordTypeA,
 		Records: []string{"10.2.1.1", "10.2.1.2"},
 	})
-	rs22ID, _ := client.CreateRecordSet(zone2ID, recordsets.CreateOpts{
+	rs22ID, _ := client.CreateRecordSet(ctx, zone2ID, recordsets.CreateOpts{
 		Name:    "db.test.net.",
 		Type:    endpoint.RecordTypeCNAME,
 		Records: []string{"sql.test.net."},
@@ -318,8 +319,9 @@ func TestDesignateCreateRecords(t *testing.T) {
 }
 
 func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*recordsets.RecordSet {
+	ctx := context.TODO()
 	for i, zoneName := range []string{"example.com.", "test.net."} {
-		client.AddZone(zones.Zone{
+		client.AddZone(ctx, zones.Zone{
 			ID:     fmt.Sprintf("zone-%d", i+1),
 			Name:   zoneName,
 			Type:   "PRIMARY",
@@ -327,7 +329,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		})
 	}
 
-	_, err := client.CreateRecordSet("zone-1", recordsets.CreateOpts{
+	_, err := client.CreateRecordSet(ctx, "zone-1", recordsets.CreateOpts{
 		Name:        "www.example.com.",
 		Description: "",
 		Records:     []string{"foo"},
@@ -417,8 +419,8 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(func(zone *zones.Zone) error {
-		client.ForEachRecordSet(zone.ID, func(recordSet *recordsets.RecordSet) error {
+	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			id := recordSet.ID
 			recordSet.ID = ""
 			for i, ex := range expected {
@@ -449,6 +451,7 @@ func TestDesignateUpdateRecords(t *testing.T) {
 
 func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*recordsets.RecordSet {
 	expected := testDesignateCreateRecords(t, client)
+	ctx := context.TODO()
 
 	updatesOld := []*endpoint.Endpoint{
 		{
@@ -505,8 +508,8 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(func(zone *zones.Zone) error {
-		client.ForEachRecordSet(zone.ID, func(recordSet *recordsets.RecordSet) error {
+	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)
 				if reflect.DeepEqual(ex, recordSet) {
@@ -533,6 +536,8 @@ func TestDesignateDeleteRecords(t *testing.T) {
 
 func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 	expected := testDesignateUpdateRecords(t, client)
+	ctx := context.TODO()
+
 	deletes := []*endpoint.Endpoint{
 		{
 			DNSName:    "www.example.com.",
@@ -563,8 +568,8 @@ func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(func(zone *zones.Zone) error {
-		client.ForEachRecordSet(zone.ID, func(recordSet *recordsets.RecordSet) error {
+	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)
 				if reflect.DeepEqual(ex, recordSet) {
