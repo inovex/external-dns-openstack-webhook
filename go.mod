@@ -7,7 +7,7 @@ require (
 	sigs.k8s.io/external-dns v0.14.2
 )
 
-require github.com/gophercloud/gophercloud/v2 v2.0.0
+require github.com/gophercloud/gophercloud/v2 v2.1.0
 
 require (
 	github.com/aws/aws-sdk-go v1.53.3 // indirect
@@ -20,7 +20,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
