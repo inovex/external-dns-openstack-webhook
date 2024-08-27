@@ -1,7 +1,5 @@
 name: devstack
-
 on:
-  push:
   pull_request:
 
 jobs:

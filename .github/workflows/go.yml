@@ -1,22 +1,53 @@
-name: go
+name: Build, Test and Release Binaries
 on:
-  push:
-  pull_request:
+  push
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.23.x
-
       - uses: actions/checkout@v4
-
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --exclude-files ".*_test.go"
+          version: latest
       - name: go build
         run: go build ./...
-
       - name: go test
         run: go test -v ./...
+
+  release:
+    if: startsWith(github.event.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+        - name: Login to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+        - name: Setup Go
+          uses: actions/setup-go@v5
+          with:
+            go-version: 1.23.x
+
+        - name: Run Goreleaser
+          if: ${{ github.event_name != 'pull_request' }}
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          uses: goreleaser/goreleaser-action@v5
+          with:
+            version: latest
+            args: release --clean
