@@ -1,0 +1,101 @@
+project_name: external-dns-openstack-webhook
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: external-dns-openstack-webhook
+    dir: .
+    main: ./cmd/webhook/
+    binary: external-dns-openstack-webhook
+    flags:
+      - -tags=netgo
+      - -v
+      - -a
+    ldflags:
+      - -w -s
+      - -X main.version={{ .Version }} -X main.commit={{ .Commit }}
+    goos:
+      - darwin
+      - freebsd
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+      - riscv64
+    goarm:
+      - "5"
+      - "6"
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: riscv64
+
+dockers:
+  - ids:
+      - external-dns-openstack-webhook
+    image_templates:
+      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64
+    goos: linux
+    goarch: amd64
+    dockerfile: goreleaser.dockerfile
+    build_flag_templates:
+      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
+      - "--platform=linux/amd64"
+    use: buildx
+  - ids:
+      - external-dns-openstack-webhook
+    image_templates:
+      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64
+    goos: linux
+    goarch: arm64
+    dockerfile: goreleaser.dockerfile
+    build_flag_templates:
+      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
+      - "--platform=linux/arm64"
+    use: buildx
+  - ids:
+      - external-dns-openstack-webhook
+    image_templates:
+      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-riscv64
+    goos: linux
+    goarch: riscv64
+    dockerfile: goreleaser.dockerfile
+    build_flag_templates:
+      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
+      - "--platform=linux/riscv64"
+    use: buildx
+
+docker_manifests:
+  - name_template: "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-riscv64"
+
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+    format: tar.gz
+    wrap_in_directory: true
+
+checksum:
+  name_template: "{{ .ProjectName }}-{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# Configuration for GitHub Releases
+release:
+  github:
+    owner: inovex
+    name: external-dns-openstack-webhook
+  footer: |
+    ## Docker Images
+    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }} (universal, multi-platform)
+    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-amd64
+    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-arm64
+    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-riscv64
+  prerelease: auto
+  replace_existing_draft: true
