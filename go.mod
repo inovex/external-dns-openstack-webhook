@@ -7,7 +7,7 @@ require (
 	sigs.k8s.io/external-dns v0.14.2
 )
 
-require github.com/gophercloud/gophercloud/v2 v2.1.0
+require github.com/gophercloud/gophercloud/v2 v2.1.1
 
 require (
 	github.com/aws/aws-sdk-go v1.53.3 // indirect
