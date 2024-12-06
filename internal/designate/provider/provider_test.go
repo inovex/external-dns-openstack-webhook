@@ -185,11 +185,26 @@ func TestNewDesignateProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	os.Setenv("OS_AUTH_URL", ts.URL+"/v3")
-	os.Setenv("OS_USERNAME", "username")
-	os.Setenv("OS_PASSWORD", "password")
-	os.Setenv("OS_USER_DOMAIN_NAME", "Default")
-	os.Setenv("OPENSTACK_CA_FILE", tmpfile.Name())
+	tmpcloudsyaml, err := os.CreateTemp("", "clouds.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpcloudsyaml.Name())
+
+	tmpcloudsyaml.WriteString(fmt.Sprintf(`
+clouds:
+  unittest:
+    auth:
+      auth_url: %s/v3
+      application_credential_id: fakefake
+      application_credential_secret: fakefake
+    region_name: RegionOne
+    interface: public
+    auth_type: v3applicationcredential`, ts.URL))
+
+	os.Setenv("OS_CLIENT_CONFIG_FILE", tmpcloudsyaml.Name())
+	os.Setenv("OS_CLOUD", "unittest")
+	os.Setenv("OS_CACERT", tmpfile.Name())
 
 	if _, err := NewDesignateProvider(endpoint.DomainFilter{}, true); err != nil {
 		t.Fatalf("Failed to initialize Designate provider: %s", err)
