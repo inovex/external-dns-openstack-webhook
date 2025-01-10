@@ -18,5 +18,5 @@ func main() {
 
 	log.SetLevel(log.DebugLevel)
 	log.Printf("Starting server")
-	api.StartHTTPApi(dp, nil, 0, 0, "127.0.0.1:8888")
+	api.StartHTTPApi(dp, nil, 0, 0, "127.0.0.1:8080")
 }
