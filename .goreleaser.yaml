@@ -79,7 +79,8 @@ docker_manifests:
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    format: tar.gz
+    formats:
+      - tar.gz
     wrap_in_directory: true
 
 checksum:
