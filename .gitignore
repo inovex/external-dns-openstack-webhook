@@ -2,3 +2,4 @@ build/
 
 # vim swap files
 .*.sw*
+clouds.yaml
