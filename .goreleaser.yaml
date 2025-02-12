@@ -9,12 +9,12 @@ builds:
     dir: .
     main: ./cmd/webhook/
     binary: external-dns-openstack-webhook
+    env:
+      - CGO_ENABLED=0 # build a static binary without C dependencies
     flags:
-      - -tags=netgo
       - -v
       - -a
     ldflags:
-      - -w -s
       - -X main.version={{ .Version }} -X main.commit={{ .Commit }}
     goos:
       - darwin
