@@ -9,7 +9,7 @@ require (
 	sigs.k8s.io/external-dns v0.15.1
 )
 
-require github.com/gophercloud/gophercloud/v2 v2.4.0
+require github.com/gophercloud/gophercloud/v2 v2.5.0
 
 require (
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.46.3 // indirect
@@ -33,7 +33,7 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
