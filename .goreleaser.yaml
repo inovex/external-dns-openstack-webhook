@@ -24,7 +24,6 @@ builds:
       - amd64
       - arm
       - arm64
-      - riscv64
     goarm:
       - "5"
       - "6"
