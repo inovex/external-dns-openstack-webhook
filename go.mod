@@ -1,8 +1,6 @@
 module external-dns-openstack-webhook
 
-go 1.23.3
-
-toolchain go1.23.4
+go 1.24
 
 require (
 	github.com/sirupsen/logrus v1.9.3
