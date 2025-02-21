@@ -31,8 +31,6 @@ builds:
     ignore:
       - goos: darwin
         goarch: arm
-      - goos: darwin
-        goarch: riscv64
 
 dockers:
   - ids:
@@ -57,24 +55,12 @@ dockers:
       - "--build-arg=BINARY_NAME={{ .ProjectName }}"
       - "--platform=linux/arm64"
     use: buildx
-  - ids:
-      - external-dns-openstack-webhook
-    image_templates:
-      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-riscv64
-    goos: linux
-    goarch: riscv64
-    dockerfile: goreleaser.dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/riscv64"
-    use: buildx
 
 docker_manifests:
   - name_template: "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}"
     image_templates:
       - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64"
       - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64"
-      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-riscv64"
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
@@ -96,6 +82,5 @@ release:
     - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }} (universal, multi-platform)
     - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-amd64
     - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-arm64
-    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-riscv64
   prerelease: auto
   replace_existing_draft: true
