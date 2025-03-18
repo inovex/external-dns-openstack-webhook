@@ -71,7 +71,7 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 		return nil, err
 	}
 
-	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithTLSConfig(tlsConfig))
+	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithTLSConfig(tlsConfig), config.WithAllowReauth(true))
 	if err != nil {
 		return nil, err
 	}
