@@ -238,6 +238,7 @@ func TestDesignateRecords(t *testing.T) {
 	rs14ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
 		Name:    "ftp.example.com.",
 		Type:    endpoint.RecordTypeA,
+		TTL:     120,
 		Records: []string{"10.1.1.2"},
 	})
 
@@ -281,6 +282,7 @@ func TestDesignateRecords(t *testing.T) {
 			DNSName:    "ftp.example.com",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
+			RecordTTL:  120,
 			Labels: map[string]string{
 				designateRecordSetID:     rs14ID,
 				designateZoneID:          zone1ID,
@@ -321,7 +323,7 @@ out:
 				continue out
 			}
 		}
-		t.Errorf("unexpected endpoint %s/%s -> %s", ep.DNSName, ep.RecordType, ep.Targets)
+		t.Errorf("unexpected endpoint %s/%s (TTL: %d) -> %s", ep.DNSName, ep.RecordType, ep.RecordTTL, ep.Targets)
 	}
 	if len(expected) != 0 {
 		t.Errorf("not all expected endpoints were returned. Remained: %v", expected)
@@ -353,7 +355,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 	})
 
 	if err != nil {
-		t.Fatal("failed to prefil records")
+		t.Fatal("failed to prefill records")
 	}
 
 	endpoints := []*endpoint.Endpoint{
@@ -373,6 +375,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			DNSName:    "ftp.example.com",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
+			RecordTTL:  120,
 			Labels:     map[string]string{},
 		},
 		{
@@ -411,6 +414,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			Name:    "ftp.example.com.",
 			Type:    endpoint.RecordTypeA,
 			Records: []string{"10.1.1.2"},
+			TTL:     120,
 			ZoneID:  "zone-1",
 		},
 		{
@@ -473,6 +477,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			DNSName:    "ftp.example.com",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
+			RecordTTL:  120,
 			Labels: map[string]string{
 				designateZoneID:          "zone-1",
 				designateRecordSetID:     expected[2].ID,
@@ -495,6 +500,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			DNSName:    "ftp.example.com",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.3.3.1"},
+			RecordTTL:  60,
 			Labels: map[string]string{
 				designateZoneID:          "zone-1",
 				designateRecordSetID:     expected[2].ID,
