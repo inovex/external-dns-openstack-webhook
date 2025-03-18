@@ -143,7 +143,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 					return nil
 				}
 
-				ep := endpoint.NewEndpoint(recordSet.Name, recordSet.Type, recordSet.Records...)
+				ep := endpoint.NewEndpointWithTTL(recordSet.Name, recordSet.Type, endpoint.TTL(recordSet.TTL), recordSet.Records...)
 				ep.Labels[designateRecordSetID] = recordSet.ID
 				ep.Labels[designateZoneID] = recordSet.ZoneID
 				ep.Labels[designateOriginalRecords] = strings.Join(recordSet.Records, "\000")
@@ -166,6 +166,7 @@ type recordSet struct {
 	recordType  string
 	zoneID      string
 	recordSetID string
+	ttl         int
 	names       map[string]bool
 }
 
@@ -178,6 +179,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 			dnsName:    canonicalizeDomainName(ep.DNSName),
 			recordType: ep.RecordType,
 			names:      make(map[string]bool),
+			ttl:        int(ep.RecordTTL),
 		}
 	}
 
@@ -288,6 +290,7 @@ func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, m
 			Name:    rs.dnsName,
 			Type:    rs.recordType,
 			Records: records,
+			TTL:     rs.ttl,
 		}
 		log.Infof("Creating records: %s/%s: %s", rs.dnsName, rs.recordType, strings.Join(records, ","))
 		if p.dryRun {
@@ -302,10 +305,9 @@ func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, m
 		}
 		return p.client.DeleteRecordSet(ctx, rs.zoneID, rs.recordSetID)
 	} else {
-		ttl := 0
 		opts := recordsets.UpdateOpts{
 			Records: records,
-			TTL:     &ttl,
+			TTL:     &rs.ttl,
 		}
 		log.Infof("Updating records: %s/%s: %s", rs.dnsName, rs.recordType, strings.Join(records, ","))
 		if p.dryRun {
