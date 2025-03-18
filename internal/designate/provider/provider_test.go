@@ -522,6 +522,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 	copy(expectedCopy, expected)
 
 	expected[2].Records = []string{"10.3.3.1"}
+	expected[2].TTL = 60
 	expected[3].Records = []string{"10.2.1.1", "10.3.3.2"}
 
 	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{UpdateOld: updatesOld, UpdateNew: updatesNew})

@@ -179,7 +179,6 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 			dnsName:    canonicalizeDomainName(ep.DNSName),
 			recordType: ep.RecordType,
 			names:      make(map[string]bool),
-			ttl:        int(ep.RecordTTL),
 		}
 	}
 
@@ -191,6 +190,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 	if rs.recordSetID == "" {
 		rs.recordSetID = ep.Labels[designateRecordSetID]
 	}
+	rs.ttl = int(ep.RecordTTL)
 	for _, rec := range strings.Split(ep.Labels[designateOriginalRecords], "\000") {
 		if _, ok := rs.names[rec]; !ok && rec != "" {
 			rs.names[rec] = true
