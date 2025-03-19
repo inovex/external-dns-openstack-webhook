@@ -609,3 +609,62 @@ func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 		t.Errorf("not all expected record-sets were deleted. Remained: %v", expected)
 	}
 }
+
+func TestGetHostZoneID(t *testing.T) {
+	tests := []struct {
+		name     string
+		zones    []string
+		hostname string
+		want     string
+	}{
+		{
+			name:     "no zone",
+			zones:    []string{},
+			hostname: "example.com.",
+			want:     "",
+		},
+		{
+			name:     "one mismatched zone",
+			zones:    []string{"foo.com."},
+			hostname: "example.com.",
+			want:     "",
+		},
+		{
+			name:     "one matching zone",
+			zones:    []string{"example.com."},
+			hostname: "example.com.",
+			want:     "example.com.",
+		},
+		{
+			name:     "one matching zone, multiple mismatched ones",
+			zones:    []string{"example.com.", "foo.com.", "bar.com."},
+			hostname: "example.com.",
+			want:     "example.com.",
+		},
+		{
+			name:     "should use longer of two matching zones",
+			zones:    []string{"example.com.", "test.example.com."},
+			hostname: "foo.test.example.com.",
+			want:     "test.example.com.",
+		},
+		{
+			name:     "should not match on suffix",
+			zones:    []string{"example.com.", "test.example.com."},
+			hostname: "first-test.example.com.",
+			want:     "example.com.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zoneMap := map[string]string{}
+			for _, zone := range tt.zones {
+				zoneMap[zone] = zone
+			}
+			got := getHostZoneID(tt.hostname, zoneMap)
+			if got != tt.want {
+				t.Errorf("got=%s, want=%s for hostname=%s and zones=%s", got, tt.want, tt.hostname, tt.zones)
+			}
+		})
+	}
+}

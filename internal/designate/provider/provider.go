@@ -111,12 +111,12 @@ func (p designateProvider) getZones(ctx context.Context) (map[string]string, err
 }
 
 // finds best suitable DNS zone for the hostname
-func (p designateProvider) getHostZoneID(hostname string, managedZones map[string]string) (string, error) {
+func getHostZoneID(hostname string, managedZones map[string]string) string {
 	longestZoneLength := 0
 	resultID := ""
 
 	for zoneID, zoneName := range managedZones {
-		if !strings.HasSuffix(hostname, zoneName) {
+		if !strings.HasSuffix(hostname, "." + zoneName) && hostname != zoneName {
 			continue
 		}
 		ln := len(zoneName)
@@ -126,7 +126,7 @@ func (p designateProvider) getHostZoneID(hostname string, managedZones map[strin
 		}
 	}
 
-	return resultID, nil
+	return resultID
 }
 
 // Records returns the list of records.
@@ -266,11 +266,7 @@ func (p designateProvider) ApplyChanges(ctx context.Context, changes *plan.Chang
 // apply recordset changes by inserting/updating/deleting recordsets
 func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, managedZones map[string]string) error {
 	if rs.zoneID == "" {
-		var err error
-		rs.zoneID, err = p.getHostZoneID(rs.dnsName, managedZones)
-		if err != nil {
-			return err
-		}
+		rs.zoneID = getHostZoneID(rs.dnsName, managedZones)
 		if rs.zoneID == "" {
 			log.Debugf("Skipping record %s because no hosted zone matching record DNS Name was detected", rs.dnsName)
 			return nil
