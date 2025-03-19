@@ -14,6 +14,11 @@ import (
 	"sigs.k8s.io/external-dns/provider/webhook/api"
 )
 
+const (
+	webhookServerAddr = "127.0.0.1:8888"
+	statusServerAddr  = "0.0.0.0:8080"
+)
+
 func main() {
 	log.SetLevel(log.DebugLevel)
 
@@ -34,19 +39,19 @@ func main() {
 	m.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
 
 	go func() {
-		log.Debug("Starting status server on :8080")
+		log.Debugf("Starting status server on %s", statusServerAddr)
 		s := &http.Server{
-			Addr:    "0.0.0.0:8080",
+			Addr:    statusServerAddr,
 			Handler: m,
 		}
 
-		l, err := net.Listen("tcp", "0.0.0.0:8080")
+		l, err := net.Listen("tcp", statusServerAddr)
 		if err != nil {
 			log.Fatal(err)
 		}
 		err = s.Serve(l)
 		if err != nil {
-			log.Fatalf("health listener stopped : %s", err)
+			log.Fatalf("status listener stopped : %s", err)
 		}
 	}()
 
@@ -56,6 +61,6 @@ func main() {
 		log.Fatalf("NewDesignateProvider: %v", err)
 	}
 
-	log.Printf("Starting server")
-	api.StartHTTPApi(dp, startedChan, 0, 0, "127.0.0.1:8888")
+	log.Debugf("Starting webhook server on %s", webhookServerAddr)
+	api.StartHTTPApi(dp, startedChan, 0, 0, webhookServerAddr)
 }
