@@ -8,6 +8,8 @@ import (
 
 	"external-dns-openstack-webhook/internal/designate/provider"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/provider/webhook/api"
 )
@@ -29,6 +31,7 @@ func main() {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
+	m.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
 
 	go func() {
 		log.Debug("Starting status server on :8080")
@@ -46,7 +49,6 @@ func main() {
 			log.Fatalf("health listener stopped : %s", err)
 		}
 	}()
-
 
 	epf := endpoint.NewDomainFilter([]string{})
 	dp, err := provider.NewDesignateProvider(epf, false)
