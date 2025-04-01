@@ -94,7 +94,7 @@ func (p designateProvider) getZones(ctx context.Context) (map[string]string, err
 
 	err := p.client.ForEachZone(ctx,
 		func(zone *zones.Zone) error {
-			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status != "ACTIVE" {
+			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status == "DELETE" {
 				return nil
 			}
 
