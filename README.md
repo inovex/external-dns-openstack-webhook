@@ -22,8 +22,6 @@ provider:
       - name: oscloudsyaml
         mountPath: /etc/openstack/
     resources: {}
-    securityContext:
-      runAsUser: 1000
 ```
 
 The referenced `extraVolumeMount` points to a `Secret` containing the `clouds.yaml` file, which provides the OpenStack Keystone credentials to the webhook provider. While it seems cumbersome to require a file instead of the commonly used `OS_*` environment variables, the use of a `clouds.yaml` file offers more structure, capabilities and allows for better validation.
