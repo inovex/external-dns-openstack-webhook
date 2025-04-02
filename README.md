@@ -23,6 +23,10 @@ provider:
       - name: oscloudsyaml
         mountPath: /etc/openstack/
     resources: {}
+extraVolumes:
+  - name: oscloudsyaml
+    secret:
+      secretName: oscloudsyaml
 ```
 
 The referenced `extraVolumeMount` points to a `Secret` containing the `clouds.yaml` file, which provides the OpenStack Keystone credentials to the webhook provider. While it seems cumbersome to require a file instead of the commonly used `OS_*` environment variables, the use of a `clouds.yaml` file offers more structure, capabilities and allows for better validation.
@@ -45,15 +49,6 @@ An existing file can be converted into a Secret via kubectl:
 
 ```shell
 kubectl create secret generic oscloudsyaml --namespace external-dns --from-file=clouds.yaml
-```
-
-and then also be added an extraVolume to within the `values.yaml` of external-dns:
-
-```yaml
-extraVolumes:
-  - name: oscloudsyaml
-    secret:
-      secretName: oscloudsyaml
 ```
 
 ## Bugs or feature requests
