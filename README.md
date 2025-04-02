@@ -29,9 +29,12 @@ extraVolumes:
       secretName: oscloudsyaml
 ```
 
-The referenced `extraVolumeMount` points to a `Secret` containing the `clouds.yaml` file, which provides the OpenStack Keystone credentials to the webhook provider. While it seems cumbersome to require a file instead of the commonly used `OS_*` environment variables, the use of a `clouds.yaml` file offers more structure, capabilities and allows for better validation.
+The referenced `extraVolumeMount` points to a `Secret` containing a [`clouds.yaml` file](https://docs.openstack.org/python-openstackclient/latest/configuration/index.html#clouds-yaml),
+which provides the OpenStack Keystone credentials to the webhook provider.
+`OS_*` environment variables are not supported for configuration, since the use of a `clouds.yaml` file offers more structure, capabilities and allows for better validation.
+The one exception to this is `OS_CLOUD` for setting the name of the cloud in `clouds.yaml` to use.
 
-The following example is a basic example of such a file, using `openstack` as the cloud name (which is the default used by this webhook):
+The following example is a basic example of a `clouds.yaml` file, using `openstack` as the cloud name (the default used by this webhook):
 
 ```yaml
 clouds:
@@ -58,7 +61,8 @@ In such cases, please raise a GitHub issue with as much detail as possible. PRs 
 
 ## Development
 
-To run the webhook locally, you'll also require a [clouds.yaml](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html#clouds-yaml) file in one of the standard-locations. Also the name of the entry to be used has be given via `OS_CLOUD` environment variable.
+To run the webhook locally, you'll also require a [clouds.yaml](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html#clouds-yaml) file in one of the standard-locations.
+Also the name of the entry to be used has be given via `OS_CLOUD` environment variable.
 You can then start the webhook server using:
 
 ```sh
