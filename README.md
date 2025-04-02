@@ -5,8 +5,9 @@ This projects externalizes the in-tree [OpenStack Designate provider](https://gi
 
 ## Installation
 
-This webhook provider is run easiest as sidecar within the `external-dns` pod. This can be achieved using the official
-`external-dns` Helm chart and [its support for the `webhook` provider type]([https://kubernetes-sigs.github.io/external-dns/latest/charts/external-dns/#providers]).
+This webhook provider is run easiest as sidecar within the `external-dns` pod. This can be achieved using the 
+[official `external-dns` Helm chart](https://kubernetes-sigs.github.io/external-dns/latest/charts/external-dns/)
+and [its support for the `webhook` provider type]([https://kubernetes-sigs.github.io/external-dns/latest/charts/external-dns/#providers]).
 
 Setting the `provider.name` to `webhook` allows configuration of the
 `external-dns-openstack-webhook` via a few additional values:
