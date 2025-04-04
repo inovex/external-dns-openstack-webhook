@@ -8,6 +8,7 @@ import (
 
 	"external-dns-openstack-webhook/internal/designate/provider"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"sigs.k8s.io/external-dns/endpoint"
@@ -18,6 +19,17 @@ const (
 	webhookServerAddr = "127.0.0.1:8888"
 	statusServerAddr  = "0.0.0.0:8080"
 )
+
+var (
+	openstackConnectionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "external_dns_webhook_openstack_connection",
+		Help: "Indicates if the webhook has a connection to the OpenStack API (1 for connected, 0 for not connected)",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(openstackConnectionMetric)
+}
 
 func main() {
 	log.SetLevel(log.DebugLevel)
@@ -59,7 +71,10 @@ func main() {
 	dp, err := provider.NewDesignateProvider(epf, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
+		openstackConnectionMetric.Set(0)
 	}
+	openstackConnectionMetric.Set(1)
+	log.Debugf("Connected to OpenStack API")
 
 	log.Debugf("Starting webhook server on %s", webhookServerAddr)
 	api.StartHTTPApi(dp, startedChan, 0, 0, webhookServerAddr)
