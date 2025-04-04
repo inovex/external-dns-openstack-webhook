@@ -94,7 +94,7 @@ func (p designateProvider) getZones(ctx context.Context) (map[string]string, err
 
 	err := p.client.ForEachZone(ctx,
 		func(zone *zones.Zone) error {
-			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status != "ACTIVE" {
+			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status == "DELETE" {
 				return nil
 			}
 
@@ -111,12 +111,12 @@ func (p designateProvider) getZones(ctx context.Context) (map[string]string, err
 }
 
 // finds best suitable DNS zone for the hostname
-func (p designateProvider) getHostZoneID(hostname string, managedZones map[string]string) (string, error) {
+func getHostZoneID(hostname string, managedZones map[string]string) string {
 	longestZoneLength := 0
 	resultID := ""
 
 	for zoneID, zoneName := range managedZones {
-		if !strings.HasSuffix(hostname, zoneName) {
+		if !strings.HasSuffix(hostname, "." + zoneName) && hostname != zoneName {
 			continue
 		}
 		ln := len(zoneName)
@@ -126,7 +126,7 @@ func (p designateProvider) getHostZoneID(hostname string, managedZones map[strin
 		}
 	}
 
-	return resultID, nil
+	return resultID
 }
 
 // Records returns the list of records.
@@ -143,7 +143,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 					return nil
 				}
 
-				ep := endpoint.NewEndpoint(recordSet.Name, recordSet.Type, recordSet.Records...)
+				ep := endpoint.NewEndpointWithTTL(recordSet.Name, recordSet.Type, endpoint.TTL(recordSet.TTL), recordSet.Records...)
 				ep.Labels[designateRecordSetID] = recordSet.ID
 				ep.Labels[designateZoneID] = recordSet.ZoneID
 				ep.Labels[designateOriginalRecords] = strings.Join(recordSet.Records, "\000")
@@ -166,6 +166,7 @@ type recordSet struct {
 	recordType  string
 	zoneID      string
 	recordSetID string
+	ttl         int
 	names       map[string]bool
 }
 
@@ -189,6 +190,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 	if rs.recordSetID == "" {
 		rs.recordSetID = ep.Labels[designateRecordSetID]
 	}
+	rs.ttl = int(ep.RecordTTL)
 	for _, rec := range strings.Split(ep.Labels[designateOriginalRecords], "\000") {
 		if _, ok := rs.names[rec]; !ok && rec != "" {
 			rs.names[rec] = true
@@ -264,11 +266,7 @@ func (p designateProvider) ApplyChanges(ctx context.Context, changes *plan.Chang
 // apply recordset changes by inserting/updating/deleting recordsets
 func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, managedZones map[string]string) error {
 	if rs.zoneID == "" {
-		var err error
-		rs.zoneID, err = p.getHostZoneID(rs.dnsName, managedZones)
-		if err != nil {
-			return err
-		}
+		rs.zoneID = getHostZoneID(rs.dnsName, managedZones)
 		if rs.zoneID == "" {
 			log.Debugf("Skipping record %s because no hosted zone matching record DNS Name was detected", rs.dnsName)
 			return nil
@@ -288,6 +286,7 @@ func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, m
 			Name:    rs.dnsName,
 			Type:    rs.recordType,
 			Records: records,
+			TTL:     rs.ttl,
 		}
 		log.Infof("Creating records: %s/%s: %s", rs.dnsName, rs.recordType, strings.Join(records, ","))
 		if p.dryRun {
@@ -302,10 +301,9 @@ func (p designateProvider) upsertRecordSet(ctx context.Context, rs *recordSet, m
 		}
 		return p.client.DeleteRecordSet(ctx, rs.zoneID, rs.recordSetID)
 	} else {
-		ttl := 0
 		opts := recordsets.UpdateOpts{
 			Records: records,
-			TTL:     &ttl,
+			TTL:     &rs.ttl,
 		}
 		log.Infof("Updating records: %s/%s: %s", rs.dnsName, rs.recordType, strings.Join(records, ","))
 		if p.dryRun {
