@@ -17,8 +17,12 @@ var (
 		Name: "external_dns_webhook_total_api_calls",
 		Help: "Total number of API calls",
 	})
+	ApiCallLatency = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name: "external_dns_webhook_api_call_latency_seconds",
+		Help: "Latency of OpenStack API calls",
+	}, []string{"method"}) // method label to differentiate API calls
 )
 
 func init() {
-	prometheus.MustRegister(OpenstackConnectionMetric, FailedApiCallsTotal, TotalApiCalls)
+	prometheus.MustRegister(OpenstackConnectionMetric, FailedApiCallsTotal, ApiCallLatency, TotalApiCalls)
 }
