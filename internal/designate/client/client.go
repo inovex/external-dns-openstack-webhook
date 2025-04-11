@@ -19,6 +19,9 @@ package client
 
 import (
 	"context"
+	"time"
+
+	"external-dns-openstack-webhook/internal/metrics"
 
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack"
@@ -71,7 +74,7 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 		return nil, err
 	}
 	authOptions.AllowReauth = true
-	
+
 	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithTLSConfig(tlsConfig))
 	if err != nil {
 		return nil, err
@@ -88,8 +91,10 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 
 // ForEachZone calls handler for each zone managed by the Designate
 func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
+	startTime := time.Now()
+	metrics.TotalApiCalls.Inc()
 	pager := zones.List(c.serviceClient, zones.ListOpts{})
-	return pager.EachPage(ctx,
+	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
 			list, err := zones.ExtractZones(page)
 			if err != nil {
@@ -104,12 +109,20 @@ func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zon
 			return true, nil
 		},
 	)
+	duration := time.Since(startTime)
+	metrics.ApiCallLatency.WithLabelValues("ForEachZone").Observe(duration.Seconds())
+	if err != nil {
+		metrics.FailedApiCallsTotal.Inc()
+	}
+	return err
 }
 
 // ForEachRecordSet calls handler for each recordset in the given DNS zone
 func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
+	startTime := time.Now()
+	metrics.TotalApiCalls.Inc()
 	pager := recordsets.ListByZone(c.serviceClient, zoneID, recordsets.ListOpts{})
-	return pager.EachPage(ctx,
+	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
 			list, err := recordsets.ExtractRecordSets(page)
 			if err != nil {
@@ -124,12 +137,23 @@ func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, ha
 			return true, nil
 		},
 	)
+	duration := time.Since(startTime)
+	metrics.ApiCallLatency.WithLabelValues("ForEachRecordSet").Observe(duration.Seconds())
+	if err != nil {
+		metrics.FailedApiCallsTotal.Inc()
+	}
+	return err
 }
 
 // CreateRecordSet creates recordset in the given DNS zone
 func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opts recordsets.CreateOpts) (string, error) {
+	startTime := time.Now()
+	metrics.TotalApiCalls.Inc()
 	r, err := recordsets.Create(ctx, c.serviceClient, zoneID, opts).Extract()
+	duration := time.Since(startTime)
+	metrics.ApiCallLatency.WithLabelValues("CreateRecordSet").Observe(duration.Seconds())
 	if err != nil {
+		metrics.FailedApiCallsTotal.Inc()
 		return "", err
 	}
 	return r.ID, nil
@@ -137,11 +161,26 @@ func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opt
 
 // UpdateRecordSet updates recordset in the given DNS zone
 func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
+	startTime := time.Now()
+	metrics.TotalApiCalls.Inc()
 	_, err := recordsets.Update(ctx, c.serviceClient, zoneID, recordSetID, opts).Extract()
+	duration := time.Since(startTime)
+	metrics.ApiCallLatency.WithLabelValues("UpdateRecordSet").Observe(duration.Seconds())
+	if err != nil {
+		metrics.FailedApiCallsTotal.Inc()
+	}
 	return err
 }
 
 // DeleteRecordSet deletes recordset in the given DNS zone
 func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error {
-	return recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
+	startTime := time.Now()
+	metrics.TotalApiCalls.Inc()
+	err := recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
+	duration := time.Since(startTime)
+	metrics.ApiCallLatency.WithLabelValues("DeleteRecordSet").Observe(duration.Seconds())
+	if err != nil {
+		metrics.FailedApiCallsTotal.Inc()
+	}
+	return err
 }
