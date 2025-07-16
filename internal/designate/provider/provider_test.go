@@ -191,7 +191,7 @@ func TestNewDesignateProvider(t *testing.T) {
 	}
 	defer os.Remove(tmpcloudsyaml.Name())
 
-	tmpcloudsyaml.WriteString(fmt.Sprintf(`
+	fmt.Fprintf(tmpcloudsyaml, `
 clouds:
   unittest:
     auth:
@@ -200,7 +200,7 @@ clouds:
       application_credential_secret: fakefake
     region_name: RegionOne
     interface: public
-    auth_type: v3applicationcredential`, ts.URL))
+    auth_type: v3applicationcredential`, ts.URL)
 
 	os.Setenv("OS_CLIENT_CONFIG_FILE", tmpcloudsyaml.Name())
 	os.Setenv("OS_CLOUD", "unittest")
