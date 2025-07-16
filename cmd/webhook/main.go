@@ -56,7 +56,7 @@ func main() {
 	}()
 
 	epf := endpoint.NewDomainFilter([]string{})
-	dp, err := provider.NewDesignateProvider(epf, false)
+	dp, err := provider.NewDesignateProvider(*epf, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
 	}
