@@ -7,9 +7,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"external-dns-openstack-webhook/internal/designate/provider"
+	"external-dns-openstack-webhook/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/provider/webhook/api"
 )
@@ -59,7 +59,10 @@ func main() {
 	dp, err := provider.NewDesignateProvider(*epf, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
+		metrics.OpenstackConnectionMetric.Set(0)
 	}
+	metrics.OpenstackConnectionMetric.Set(1)
+	log.Debugf("Connected to OpenStack API")
 
 	log.Debugf("Starting webhook server on %s", webhookServerAddr)
 	api.StartHTTPApi(dp, startedChan, 0, 0, webhookServerAddr)
