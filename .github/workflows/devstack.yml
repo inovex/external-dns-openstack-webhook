@@ -29,7 +29,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.x"
+          go-version: "1.24.x"
           cache-dependency-path: |
             ./go.sum
             ./external-dns/go.sum
@@ -107,5 +107,5 @@ jobs:
 
       - name: Check created entries
         run: |
-          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 20 ]; then exit 1; fi
+          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
           if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi

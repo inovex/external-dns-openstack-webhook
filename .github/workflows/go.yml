@@ -12,14 +12,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.24.x
           cache: false
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          args: --exclude-files ".*_test.go"
-          version: latest
+          version: v2.2.2
       - name: go build
         run: go build ./...
       - name: go test
@@ -41,7 +40,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.24.x
 
       - name: Run Goreleaser
         if: ${{ github.event_name != 'pull_request' }}
