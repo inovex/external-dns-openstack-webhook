@@ -92,14 +92,24 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 // ForEachZone calls handler for each zone managed by the Designate
 func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
 	startTime := time.Now()
-	metrics.TotalApiCalls.Inc()
+
 	pager := zones.List(c.serviceClient, zones.ListOpts{})
+	var pageCount int
+	var zoneCount int
+
 	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
+			// Jede Seite entspricht einem separaten API-Aufruf
+			pageCount++
+			metrics.TotalApiCalls.Inc()
+
 			list, err := zones.ExtractZones(page)
 			if err != nil {
 				return false, err
 			}
+
+			zoneCount += len(list)
+
 			for _, zone := range list {
 				err := handler(&zone)
 				if err != nil {
@@ -109,25 +119,41 @@ func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zon
 			return true, nil
 		},
 	)
+
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("ForEachZone").Observe(duration.Seconds())
+
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
+		log.Errorf("ForEachZone failed after %v: %v", duration, err)
+	} else {
+		log.Debugf("✓ ForEachZone completed: %d zones across %d pages in %v", zoneCount, pageCount, duration)
 	}
+
 	return err
 }
 
 // ForEachRecordSet calls handler for each recordset in the given DNS zone
 func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
 	startTime := time.Now()
-	metrics.TotalApiCalls.Inc()
+
 	pager := recordsets.ListByZone(c.serviceClient, zoneID, recordsets.ListOpts{})
+	var pageCount int
+	var recordCount int
+
 	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
+			// Jede Seite entspricht einem separaten API-Aufruf
+			pageCount++
+			metrics.TotalApiCalls.Inc()
+
 			list, err := recordsets.ExtractRecordSets(page)
 			if err != nil {
 				return false, err
 			}
+
+			recordCount += len(list)
+
 			for _, recordSet := range list {
 				err := handler(&recordSet)
 				if err != nil {
@@ -137,11 +163,17 @@ func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, ha
 			return true, nil
 		},
 	)
+
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("ForEachRecordSet").Observe(duration.Seconds())
+
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
+		log.Errorf("ForEachRecordSet failed for zone %s after %v: %v", zoneID, duration, err)
+	} else {
+		log.Debugf("✓ ForEachRecordSet zone=%s: %d records across %d pages in %v", zoneID[:8]+"...", recordCount, pageCount, duration)
 	}
+
 	return err
 }
 
@@ -149,13 +181,21 @@ func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, ha
 func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opts recordsets.CreateOpts) (string, error) {
 	startTime := time.Now()
 	metrics.TotalApiCalls.Inc()
+
+	log.Debugf("→ Creating recordset: %s (%s) with %d targets", opts.Name, opts.Type, len(opts.Records))
+
 	r, err := recordsets.Create(ctx, c.serviceClient, zoneID, opts).Extract()
+
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("CreateRecordSet").Observe(duration.Seconds())
+
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
+		log.Errorf("✗ CreateRecordSet failed for %s after %v: %v", opts.Name, duration, err)
 		return "", err
 	}
+
+	log.Debugf("✓ CreateRecordSet successful: %s (ID: %s) in %v", opts.Name, r.ID[:8]+"...", duration)
 	return r.ID, nil
 }
 
@@ -163,12 +203,25 @@ func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opt
 func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetID string, opts recordsets.UpdateOpts) error {
 	startTime := time.Now()
 	metrics.TotalApiCalls.Inc()
+
+	recordCount := 0
+	if opts.Records != nil {
+		recordCount = len(opts.Records)
+	}
+	log.Debugf("→ Updating recordset: %s with %d targets", recordSetID[:8]+"...", recordCount)
+
 	_, err := recordsets.Update(ctx, c.serviceClient, zoneID, recordSetID, opts).Extract()
+
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("UpdateRecordSet").Observe(duration.Seconds())
+
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
+		log.Errorf("✗ UpdateRecordSet failed for %s after %v: %v", recordSetID[:8]+"...", duration, err)
+	} else {
+		log.Debugf("✓ UpdateRecordSet successful: %s in %v", recordSetID[:8]+"...", duration)
 	}
+
 	return err
 }
 
@@ -176,11 +229,20 @@ func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetI
 func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error {
 	startTime := time.Now()
 	metrics.TotalApiCalls.Inc()
+
+	log.Debugf("→ Deleting recordset: %s", recordSetID[:8]+"...")
+
 	err := recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
+
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("DeleteRecordSet").Observe(duration.Seconds())
+
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
+		log.Errorf("✗ DeleteRecordSet failed for %s after %v: %v", recordSetID[:8]+"...", duration, err)
+	} else {
+		log.Debugf("✓ DeleteRecordSet successful: %s in %v", recordSetID[:8]+"...", duration)
 	}
+
 	return err
 }
