@@ -99,7 +99,7 @@ func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zon
 
 	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
-			// Jede Seite entspricht einem separaten API-Aufruf
+			// Each page corresponds to a separate API call.
 			pageCount++
 			metrics.TotalApiCalls.Inc()
 
@@ -143,7 +143,7 @@ func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, ha
 
 	err := pager.EachPage(ctx,
 		func(ctx context.Context, page pagination.Page) (bool, error) {
-			// Jede Seite entspricht einem separaten API-Aufruf
+			// Each page corresponds to a separate API call.
 			pageCount++
 			metrics.TotalApiCalls.Inc()
 
@@ -171,7 +171,7 @@ func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, ha
 		metrics.FailedApiCallsTotal.Inc()
 		log.Errorf("ForEachRecordSet failed for zone %s after %v: %v", zoneID, duration, err)
 	} else {
-		log.Debugf("✓ ForEachRecordSet zone=%s: %d records across %d pages in %v", zoneID[:8]+"...", recordCount, pageCount, duration)
+		log.Debugf("✓ ForEachRecordSet zone=%s: %d records across %d pages in %v", zoneID, recordCount, pageCount, duration)
 	}
 
 	return err
@@ -195,7 +195,7 @@ func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opt
 		return "", err
 	}
 
-	log.Debugf("✓ CreateRecordSet successful: %s (ID: %s) in %v", opts.Name, r.ID[:8]+"...", duration)
+	log.Debugf("✓ CreateRecordSet successful: %s (ID: %s) in %v", opts.Name, r.ID, duration)
 	return r.ID, nil
 }
 
@@ -208,7 +208,7 @@ func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetI
 	if opts.Records != nil {
 		recordCount = len(opts.Records)
 	}
-	log.Debugf("→ Updating recordset: %s with %d targets", recordSetID[:8]+"...", recordCount)
+	log.Debugf("→ Updating recordset: %s with %d targets", recordSetID, recordCount)
 
 	_, err := recordsets.Update(ctx, c.serviceClient, zoneID, recordSetID, opts).Extract()
 
@@ -217,9 +217,9 @@ func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetI
 
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
-		log.Errorf("✗ UpdateRecordSet failed for %s after %v: %v", recordSetID[:8]+"...", duration, err)
+		log.Errorf("✗ UpdateRecordSet failed for %s after %v: %v", recordSetID, duration, err)
 	} else {
-		log.Debugf("✓ UpdateRecordSet successful: %s in %v", recordSetID[:8]+"...", duration)
+		log.Debugf("✓ UpdateRecordSet successful: %s in %v", recordSetID, duration)
 	}
 
 	return err
@@ -230,7 +230,7 @@ func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetI
 	startTime := time.Now()
 	metrics.TotalApiCalls.Inc()
 
-	log.Debugf("→ Deleting recordset: %s", recordSetID[:8]+"...")
+	log.Debugf("→ Deleting recordset: %s", recordSetID)
 
 	err := recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
 
@@ -239,9 +239,9 @@ func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetI
 
 	if err != nil {
 		metrics.FailedApiCallsTotal.Inc()
-		log.Errorf("✗ DeleteRecordSet failed for %s after %v: %v", recordSetID[:8]+"...", duration, err)
+		log.Errorf("✗ DeleteRecordSet failed for %s after %v: %v", recordSetID, duration, err)
 	} else {
-		log.Debugf("✓ DeleteRecordSet successful: %s in %v", recordSetID[:8]+"...", duration)
+		log.Debugf("✓ DeleteRecordSet successful: %s in %v", recordSetID, duration)
 	}
 
 	return err
