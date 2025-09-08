@@ -11,17 +11,17 @@ jobs:
 
     steps:
       - name: Checkout external-dns-openstack-webhook
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout kubernetes-sigs/external-dns
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: kubernetes-sigs/external-dns
           path: ./external-dns
           ref: v0.18.0
 
       - name: Checkout openstack/devstack
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: openstack/devstack
           ref: "stable/2024.2"
