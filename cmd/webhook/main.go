@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 
 	"external-dns-openstack-webhook/internal/designate/provider"
 	"external-dns-openstack-webhook/internal/metrics"
@@ -20,6 +21,10 @@ const (
 )
 
 func main() {
+	var domainFilters []string
+	pflag.StringArrayVar(&domainFilters, "domain-filter", []string{}, "List of domains to work on (can be specified multiple times)")
+	pflag.Parse()
+
 	log.SetLevel(log.DebugLevel)
 
 	startedChan := make(chan struct{})
@@ -55,7 +60,7 @@ func main() {
 		}
 	}()
 
-	epf := endpoint.NewDomainFilter([]string{})
+	epf := endpoint.NewDomainFilter(domainFilters)
 	dp, err := provider.NewDesignateProvider(*epf, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
