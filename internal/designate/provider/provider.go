@@ -19,6 +19,7 @@ package provider
 
 import (
 	"context"
+	"external-dns-openstack-webhook/internal/designate/client"
 	"fmt"
 	"strings"
 
@@ -30,8 +31,6 @@ import (
 	"sigs.k8s.io/external-dns/plan"
 	"sigs.k8s.io/external-dns/provider"
 )
-
-import "external-dns-openstack-webhook/internal/designate/client"
 
 const (
 	// ID of the RecordSet from which endpoint was created
@@ -113,7 +112,7 @@ func getHostZoneID(hostname string, managedZones map[string]string) string {
 	resultID := ""
 
 	for zoneID, zoneName := range managedZones {
-		if !strings.HasSuffix(hostname, "." + zoneName) && hostname != zoneName {
+		if !strings.HasSuffix(hostname, "."+zoneName) && hostname != zoneName {
 			continue
 		}
 		ln := len(zoneName)
@@ -136,7 +135,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	for zoneID := range managedZones {
 		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
+				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME && recordSet.Type != endpoint.RecordTypeNS {
 					return nil
 				}
 
@@ -194,7 +193,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 		}
 	}
 	targets := ep.Targets
-	if ep.RecordType == endpoint.RecordTypeCNAME {
+	if ep.RecordType == endpoint.RecordTypeCNAME || ep.RecordType == endpoint.RecordTypeNS {
 		targets = canonicalizeDomainNames(targets)
 	}
 	for _, t := range targets {

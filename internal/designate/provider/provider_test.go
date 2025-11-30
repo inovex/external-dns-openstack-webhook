@@ -409,7 +409,6 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		TTL:         60,
 		Type:        endpoint.RecordTypeTXT,
 	})
-
 	if err != nil {
 		t.Fatal("failed to prefill records")
 	}
@@ -452,6 +451,12 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			Targets:    endpoint.Targets{"sql.test.net"},
 			Labels:     map[string]string{},
 		},
+		{
+			DNSName:    "ns.test.net",
+			RecordType: endpoint.RecordTypeNS,
+			Targets:    endpoint.Targets{"ns1.test.net", "ns2.test.net", "ns3.test.net"},
+			Labels:     map[string]string{},
+		},
 	}
 	expected := []*recordsets.RecordSet{
 		{
@@ -483,6 +488,12 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			Name:    "db.test.net.",
 			Type:    endpoint.RecordTypeCNAME,
 			Records: []string{"sql.test.net."},
+			ZoneID:  "zone-2",
+		},
+		{
+			Name:    "ns.test.net.",
+			Type:    endpoint.RecordTypeNS,
+			Records: []string{"ns1.test.net.", "ns2.test.net.", "ns3.test.net."},
 			ZoneID:  "zone-2",
 		},
 	}
@@ -550,6 +561,16 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 				designateOriginalRecords: "10.2.1.1\00010.2.1.2",
 			},
 		},
+		{
+			DNSName:    "ns.test.net.",
+			RecordType: endpoint.RecordTypeNS,
+			Targets:    endpoint.Targets{"ns1.test.net", "ns2.test.net", "ns3.test.net"},
+			Labels: map[string]string{
+				designateZoneID:          "zone-2",
+				designateRecordSetID:     expected[5].ID,
+				designateOriginalRecords: "ns1.test.net.\000ns2.test.net.\000ns3.test.net.",
+			},
+		},
 	}
 	updatesNew := []*endpoint.Endpoint{
 		{
@@ -573,6 +594,16 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 				designateOriginalRecords: "10.2.1.1\00010.2.1.2",
 			},
 		},
+		{
+			DNSName:    "ns.test.net.",
+			RecordType: endpoint.RecordTypeNS,
+			Targets:    endpoint.Targets{"ns1.test.invalid", "ns2.test.invalid", "ns3.test.invalid"},
+			Labels: map[string]string{
+				designateZoneID:          "zone-2",
+				designateRecordSetID:     expected[5].ID,
+				designateOriginalRecords: "ns1.test.net.\000ns2.test.net.\000ns3.test.net.",
+			},
+		},
 	}
 	expectedCopy := make([]*recordsets.RecordSet, len(expected))
 	copy(expectedCopy, expected)
@@ -580,6 +611,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 	expected[2].Records = []string{"10.3.3.1"}
 	expected[2].TTL = 60
 	expected[3].Records = []string{"10.2.1.1", "10.3.3.2"}
+	expected[5].Records = []string{"ns1.test.invalid.", "ns2.test.invalid.", "ns3.test.invalid."}
 
 	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{UpdateOld: updatesOld, UpdateNew: updatesNew})
 	if err != nil {
