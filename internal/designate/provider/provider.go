@@ -72,10 +72,7 @@ func NewDesignateProvider(domainFilter endpoint.DomainFilter, dryRun bool) (prov
 func canonicalizeDomainNames(domains []string) []string {
 	var cDomains []string
 	for _, d := range domains {
-		if !strings.HasSuffix(d, ".") {
-			d += "."
-			cDomains = append(cDomains, strings.ToLower(d))
-		}
+		cDomains = append(cDomains, canonicalizeDomainName(d))
 	}
 	return cDomains
 }
