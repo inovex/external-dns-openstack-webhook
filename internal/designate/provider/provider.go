@@ -135,7 +135,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	for zoneID := range managedZones {
 		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME && recordSet.Type != endpoint.RecordTypeNS {
+				if !p.supportedRecordType(recordSet.Type) {
 					return nil
 				}
 
@@ -154,6 +154,15 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	}
 
 	return result, nil
+}
+
+func (p designateProvider) supportedRecordType(recordType string) bool {
+	switch recordType {
+	case endpoint.RecordTypeA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME, endpoint.RecordTypeNS:
+		return true
+	default:
+		return false
+	}
 }
 
 // temporary structure to hold recordset parameters so that we could aggregate endpoints into recordsets
