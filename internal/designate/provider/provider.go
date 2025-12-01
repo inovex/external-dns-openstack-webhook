@@ -76,6 +76,22 @@ func canonicalizeDomainNames(domains []string) []string {
 	return cDomains
 }
 
+func canonicalizeDomainNamesForMX(domains []string) []string {
+	var cDomains []string
+
+	for _, d := range domains {
+		parts := strings.Split(d, " ")
+		if len(parts) == 2 {
+			// If the format does not conform to the expected one, play it safe and just pass the value on.
+			// Otherwise, canonicalize the hostname.
+			d = fmt.Sprintf("%s %s", parts[0], canonicalizeDomainName(parts[1]))
+		}
+
+		cDomains = append(cDomains, canonicalizeDomainName(d))
+	}
+	return cDomains
+}
+
 // converts domain name to FQDN
 func canonicalizeDomainName(d string) string {
 	if !strings.HasSuffix(d, ".") {
@@ -158,7 +174,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 
 func (p designateProvider) supportedRecordType(recordType string) bool {
 	switch recordType {
-	case endpoint.RecordTypeA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME, endpoint.RecordTypeNS:
+	case endpoint.RecordTypeA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME, endpoint.RecordTypeNS, endpoint.RecordTypeMX:
 		return true
 	default:
 		return false
@@ -204,6 +220,9 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 	targets := ep.Targets
 	if ep.RecordType == endpoint.RecordTypeCNAME || ep.RecordType == endpoint.RecordTypeNS {
 		targets = canonicalizeDomainNames(targets)
+	}
+	if ep.RecordType == endpoint.RecordTypeMX {
+		targets = canonicalizeDomainNamesForMX(targets)
 	}
 	for _, t := range targets {
 		rs.names[t] = !delete

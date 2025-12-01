@@ -457,6 +457,12 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			Targets:    endpoint.Targets{"ns1.test.net", "ns2.test.net", "ns3.test.net"},
 			Labels:     map[string]string{},
 		},
+		{
+			DNSName:    "mx.test.net",
+			RecordType: endpoint.RecordTypeMX,
+			Targets:    endpoint.Targets{"10 mx1.test.net", "100 mx2.test.net"},
+			Labels:     map[string]string{},
+		},
 	}
 	expected := []*recordsets.RecordSet{
 		{
@@ -494,6 +500,12 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			Name:    "ns.test.net.",
 			Type:    endpoint.RecordTypeNS,
 			Records: []string{"ns1.test.net.", "ns2.test.net.", "ns3.test.net."},
+			ZoneID:  "zone-2",
+		},
+		{
+			Name:    "mx.test.net.",
+			Type:    endpoint.RecordTypeMX,
+			Records: []string{"10 mx1.test.net.", "100 mx2.test.net."},
 			ZoneID:  "zone-2",
 		},
 	}
