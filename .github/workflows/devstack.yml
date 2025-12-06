@@ -18,7 +18,7 @@ jobs:
         with:
           repository: kubernetes-sigs/external-dns
           path: ./external-dns
-          ref: v0.18.0
+          ref: v0.20.0
 
       - name: Checkout openstack/devstack
         uses: actions/checkout@v6
