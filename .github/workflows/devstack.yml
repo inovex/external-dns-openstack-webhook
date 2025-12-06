@@ -7,7 +7,7 @@ env:
 
 jobs:
   external-dns-source-fake:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout external-dns-openstack-webhook
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: openstack/devstack
-          ref: "stable/2024.2"
+          ref: "stable/2025.2"
           path: ./devstack
 
       - name: Set up Go
@@ -60,7 +60,7 @@ jobs:
           ENABLE_HTTPD_MOD_WSGI_SERVICES=True
           DESIGNATE_BACKEND_DRIVER=bind9
 
-          enable_plugin designate https://opendev.org/openstack/designate stable/2024.2
+          enable_plugin designate https://opendev.org/openstack/designate stable/2025.2
           enable_service designate,designate-central,designate-api,designate-zone-manager,designate-mdns,designate-worker,designate-producer
           EOF
         working-directory: ./devstack
