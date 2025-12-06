@@ -1,6 +1,6 @@
 module external-dns-openstack-webhook
 
-go 1.24.2
+go 1.25
 
 require (
 	github.com/sirupsen/logrus v1.9.3
@@ -10,6 +10,7 @@ require (
 require (
 	github.com/gophercloud/gophercloud/v2 v2.7.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/spf13/pflag v1.0.7
 )
 
 require (
@@ -44,7 +45,6 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/spf13/pflag v1.0.7 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
