@@ -70,9 +70,6 @@ jobs:
         run: ./stack.sh
         working-directory: ./devstack
 
-      - name: Fix Designate
-        run: sudo sed 's/root-helper/root_helper/g' -i /etc/designate/designate.conf
-
       - name: Restart Designate
         run: sudo systemctl restart "devstack@designate-*.service"
 
