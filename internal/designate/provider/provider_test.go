@@ -144,6 +144,62 @@ func newFakeDesignateClient() *fakeDesignateClient {
 }
 
 func TestNewDesignateProvider(t *testing.T) {
+
+	// This simply fakes the existence of an reachable Designate API endpoint (v2)
+	tsDesignate := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+      "versions": [
+        {
+          "id": "v2",
+          "links": [
+            {
+              "href": "https://dns.fakecloud.local/v2",
+              "rel": "self"
+            },
+            {
+              "href": "https://docs.openstack.org/api-ref/dns",
+              "rel": "help"
+            }
+          ],
+          "status": "SUPPORTED",
+          "updated": "2022-06-29T00:00:00Z"
+        },
+        {
+          "id": "v2.0",
+          "links": [
+            {
+              "href": "https://dns.fakecloud.local/v2",
+              "rel": "self"
+            },
+            {
+              "href": "https://docs.openstack.org/api-ref/dns",
+              "rel": "help"
+            }
+          ],
+          "status": "SUPPORTED",
+          "updated": "2022-06-29T00:00:00Z"
+        },
+        {
+          "id": "v2.1",
+          "links": [
+            {
+              "href": "hhttps://dns.fakecloud.local/v2",
+              "rel": "self"
+            },
+            {
+              "href": "https://docs.openstack.org/api-ref/dns",
+              "rel": "help"
+            }
+          ],
+          "status": "CURRENT",
+          "updated": "2023-01-25T00:00:00Z"
+        }
+		}`))
+	}))
+	defer tsDesignate.Close()
+
+	// This fakes the catalog response from Keystone including the Designate endpoint
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{
@@ -159,7 +215,7 @@ func TestNewDesignateProvider(t *testing.T) {
 		            "region": "RegionOne",
 		            "region_id": "RegionOne",
 		            "interface": "public",
-		            "url": "https://example.com:9001"
+		            "url": "` + tsDesignate.URL + `/v2"
 		          }
 		        ]
 		      }
