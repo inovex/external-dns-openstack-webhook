@@ -1,7 +1,8 @@
 # ExternalDNS - OpenStack Designate Webhook
 
 This is an [ExternalDNS provider](https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/webhook-provider.md) for [OpenStack's Designate DNS server](https://docs.openstack.org/designate/latest/).
-This projects externalizes the in-tree [OpenStack Designate provider](https://github.com/kubernetes-sigs/external-dns/tree/master/provider/designate) and offers a way forward for bugfixes and new features as the in-tree providers have been [deprecated](https://github.com/kubernetes-sigs/external-dns?tab=readme-ov-file#status-of-in-tree-providers) and thus the code for OpenStack Designate will never leave the `Alpha` state.
+It serves as a replacment for the former in-tree OpenStack Designate provider which never left the `Alpha` state and has since been removed (https://github.com/kubernetes-sigs/external-dns/pull/5126).
+The webhook, while already a drop in replacement, is not perfect (yet)! If you have bugfixes and new feature suggestions - please kindly open issues and send in PRs if you feel there is something missing / broken.
 
 ## Installation
 
@@ -18,7 +19,7 @@ provider:
   webhook:
     image:
       repository: ghcr.io/inovex/external-dns-openstack-webhook
-      tag: 1.1.0
+      tag: 2.1.0
     extraVolumeMounts:
       - name: oscloudsyaml
         mountPath: /etc/openstack/
