@@ -272,50 +272,50 @@ func TestDesignateRecords(t *testing.T) {
 	ctx := context.TODO()
 
 	zone1ID := client.AddZone(ctx, zones.Zone{
-		Name:   "example.com.",
+		Name:   "example.invalid.",
 		Type:   "PRIMARY",
 		Status: "ACTIVE",
 	})
 	rs11ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
-		Name:    "www.example.com.",
+		Name:    "www.example.invalid.",
 		Type:    endpoint.RecordTypeA,
 		Records: []string{"10.1.1.1"},
 	})
 	rs12ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
-		Name:    "www.example.com.",
+		Name:    "www.example.invalid.",
 		Type:    endpoint.RecordTypeTXT,
 		Records: []string{"text1"},
 	})
 	client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
-		Name:    "xxx.example.com.",
+		Name:    "xxx.example.invalid.",
 		Type:    "SRV",
 		Records: []string{"http://test.com:1234"},
 	})
 	rs14ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
-		Name:    "ftp.example.com.",
+		Name:    "ftp.example.invalid.",
 		Type:    endpoint.RecordTypeA,
 		TTL:     120,
 		Records: []string{"10.1.1.2"},
 	})
 
 	zone2ID := client.AddZone(ctx, zones.Zone{
-		Name:   "test.net.",
+		Name:   "anotherzone.invalid.",
 		Type:   "PRIMARY",
 		Status: "ACTIVE",
 	})
 	rs21ID, _ := client.CreateRecordSet(ctx, zone2ID, recordsets.CreateOpts{
-		Name:    "srv.test.net.",
+		Name:    "srv.anotherzone.invalid.",
 		Type:    endpoint.RecordTypeA,
 		Records: []string{"10.2.1.1", "10.2.1.2"},
 	})
 	rs22ID, _ := client.CreateRecordSet(ctx, zone2ID, recordsets.CreateOpts{
-		Name:    "db.test.net.",
+		Name:    "db.anotherzone.invalid.",
 		Type:    endpoint.RecordTypeCNAME,
-		Records: []string{"sql.test.net."},
+		Records: []string{"sql.anotherzone.invalid."},
 	})
 	expected := []*endpoint.Endpoint{
 		{
-			DNSName:    "www.example.com",
+			DNSName:    "www.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.1"},
 			Labels: map[string]string{
@@ -325,7 +325,7 @@ func TestDesignateRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "www.example.com",
+			DNSName:    "www.example.invalid",
 			RecordType: endpoint.RecordTypeTXT,
 			Targets:    endpoint.Targets{"text1"},
 			Labels: map[string]string{
@@ -335,7 +335,7 @@ func TestDesignateRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "ftp.example.com",
+			DNSName:    "ftp.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
 			RecordTTL:  120,
@@ -346,7 +346,7 @@ func TestDesignateRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "srv.test.net",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.2.1.1", "10.2.1.2"},
 			Labels: map[string]string{
@@ -356,13 +356,13 @@ func TestDesignateRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "db.test.net",
+			DNSName:    "db.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeCNAME,
-			Targets:    endpoint.Targets{"sql.test.net"},
+			Targets:    endpoint.Targets{"sql.anotherzone.invalid."},
 			Labels: map[string]string{
 				designateRecordSetID:     rs22ID,
 				designateZoneID:          zone2ID,
-				designateOriginalRecords: "sql.test.net.",
+				designateOriginalRecords: "sql.anotherzone.invalid.",
 			},
 		},
 	}
@@ -393,7 +393,7 @@ func TestDesignateCreateRecords(t *testing.T) {
 
 func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*recordsets.RecordSet {
 	ctx := context.TODO()
-	for i, zoneName := range []string{"example.com.", "test.net."} {
+	for i, zoneName := range []string{"example.invalid.", "anotherzone.invalid."} {
 		client.AddZone(ctx, zones.Zone{
 			ID:     fmt.Sprintf("zone-%d", i+1),
 			Name:   zoneName,
@@ -403,7 +403,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 	}
 
 	_, err := client.CreateRecordSet(ctx, "zone-1", recordsets.CreateOpts{
-		Name:        "www.example.com.",
+		Name:        "www.example.invalid.",
 		Description: "",
 		Records:     []string{"foo"},
 		TTL:         60,
@@ -416,73 +416,73 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 
 	endpoints := []*endpoint.Endpoint{
 		{
-			DNSName:    "www.example.com",
+			DNSName:    "www.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.1"},
 			Labels:     map[string]string{},
 		},
 		{
-			DNSName:    "www.example.com",
+			DNSName:    "www.example.invalid",
 			RecordType: endpoint.RecordTypeTXT,
 			Targets:    endpoint.Targets{"text1"},
 			Labels:     map[string]string{},
 		},
 		{
-			DNSName:    "ftp.example.com",
+			DNSName:    "ftp.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
 			RecordTTL:  120,
 			Labels:     map[string]string{},
 		},
 		{
-			DNSName:    "srv.test.net",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.2.1.1"},
 			Labels:     map[string]string{},
 		},
 		{
-			DNSName:    "srv.test.net",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.2.1.2"},
 			Labels:     map[string]string{},
 		},
 		{
-			DNSName:    "db.test.net",
+			DNSName:    "db.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeCNAME,
-			Targets:    endpoint.Targets{"sql.test.net"},
+			Targets:    endpoint.Targets{"sql.anotherzone.invalid."},
 			Labels:     map[string]string{},
 		},
 	}
 	expected := []*recordsets.RecordSet{
 		{
-			Name:    "www.example.com.",
+			Name:    "www.example.invalid.",
 			Type:    endpoint.RecordTypeA,
 			Records: []string{"10.1.1.1"},
 			ZoneID:  "zone-1",
 		},
 		{
-			Name:    "www.example.com.",
+			Name:    "www.example.invalid.",
 			Type:    endpoint.RecordTypeTXT,
 			Records: []string{"text1"},
 			ZoneID:  "zone-1",
 		},
 		{
-			Name:    "ftp.example.com.",
+			Name:    "ftp.example.invalid.",
 			Type:    endpoint.RecordTypeA,
 			Records: []string{"10.1.1.2"},
 			TTL:     120,
 			ZoneID:  "zone-1",
 		},
 		{
-			Name:    "srv.test.net.",
+			Name:    "srv.anotherzone.invalid.",
 			Type:    endpoint.RecordTypeA,
 			Records: []string{"10.2.1.1", "10.2.1.2"},
 			ZoneID:  "zone-2",
 		},
 		{
-			Name:    "db.test.net.",
+			Name:    "db.anotherzone.invalid.",
 			Type:    endpoint.RecordTypeCNAME,
-			Records: []string{"sql.test.net."},
+			Records: []string{"sql.anotherzone.invalid."},
 			ZoneID:  "zone-2",
 		},
 	}
@@ -530,7 +530,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 
 	updatesOld := []*endpoint.Endpoint{
 		{
-			DNSName:    "ftp.example.com",
+			DNSName:    "ftp.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.2"},
 			RecordTTL:  120,
@@ -541,7 +541,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			},
 		},
 		{
-			DNSName:    "srv.test.net.",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.2.1.2"},
 			Labels: map[string]string{
@@ -553,7 +553,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 	}
 	updatesNew := []*endpoint.Endpoint{
 		{
-			DNSName:    "ftp.example.com",
+			DNSName:    "ftp.example.invalid",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.3.3.1"},
 			RecordTTL:  60,
@@ -564,7 +564,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 			},
 		},
 		{
-			DNSName:    "srv.test.net.",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.3.3.2"},
 			Labels: map[string]string{
@@ -618,7 +618,7 @@ func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 
 	deletes := []*endpoint.Endpoint{
 		{
-			DNSName:    "www.example.com.",
+			DNSName:    "www.example.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.1.1.1"},
 			Labels: map[string]string{
@@ -628,7 +628,7 @@ func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 			},
 		},
 		{
-			DNSName:    "srv.test.net.",
+			DNSName:    "srv.anotherzone.invalid.",
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.2.1.1"},
 			Labels: map[string]string{
@@ -676,38 +676,38 @@ func TestGetHostZoneID(t *testing.T) {
 		{
 			name:     "no zone",
 			zones:    []string{},
-			hostname: "example.com.",
+			hostname: "example.invalid.",
 			want:     "",
 		},
 		{
 			name:     "one mismatched zone",
 			zones:    []string{"foo.com."},
-			hostname: "example.com.",
+			hostname: "example.invalid.",
 			want:     "",
 		},
 		{
 			name:     "one matching zone",
-			zones:    []string{"example.com."},
-			hostname: "example.com.",
-			want:     "example.com.",
+			zones:    []string{"example.invalid."},
+			hostname: "example.invalid.",
+			want:     "example.invalid.",
 		},
 		{
 			name:     "one matching zone, multiple mismatched ones",
-			zones:    []string{"example.com.", "foo.com.", "bar.com."},
-			hostname: "example.com.",
-			want:     "example.com.",
+			zones:    []string{"example.invalid.", "foo.com.", "bar.com."},
+			hostname: "example.invalid.",
+			want:     "example.invalid.",
 		},
 		{
 			name:     "should use longer of two matching zones",
-			zones:    []string{"example.com.", "test.example.com."},
-			hostname: "foo.test.example.com.",
-			want:     "test.example.com.",
+			zones:    []string{"example.invalid.", "test.example.invalid."},
+			hostname: "foo.test.example.invalid.",
+			want:     "test.example.invalid.",
 		},
 		{
 			name:     "should not match on suffix",
-			zones:    []string{"example.com.", "test.example.com."},
-			hostname: "first-test.example.com.",
-			want:     "example.com.",
+			zones:    []string{"example.invalid.", "test.example.invalid."},
+			hostname: "first-test.example.invalid.",
+			want:     "example.invalid.",
 		},
 	}
 
