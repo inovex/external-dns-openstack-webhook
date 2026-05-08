@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	OpenstackConnectionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "external_dns_webhook_openstack_connection_initialized",
-		Help: "Indicates if the webhook has been initialized with OpenStack API credentials (1 for initialized, 0 for not initialized)",
+	TCloudPublicConnectionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "external_dns_webhook_t_cloud_public_connection_initialized",
+		Help: "Indicates if the webhook has been initialized with T-Cloud Public API credentials (1 for initialized, 0 for not initialized)",
 	})
 	FailedApiCallsTotal = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "external_dns_webhook_failed_api_calls_total",
@@ -19,10 +19,10 @@ var (
 	})
 	ApiCallLatency = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "external_dns_webhook_api_call_latency_seconds",
-		Help: "Latency of OpenStack API calls",
+		Help: "Latency of T-Cloud Public API calls",
 	}, []string{"method"}) // method label to differentiate API calls
 )
 
 func init() {
-	prometheus.MustRegister(OpenstackConnectionMetric, FailedApiCallsTotal, ApiCallLatency, TotalApiCalls)
+	prometheus.MustRegister(TCloudPublicConnectionMetric, FailedApiCallsTotal, ApiCallLatency, TotalApiCalls)
 }

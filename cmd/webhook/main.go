@@ -3,12 +3,13 @@ package main
 import (
 	"net"
 	"net/http"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
-	"external-dns-openstack-webhook/internal/designate/provider"
-	"external-dns-openstack-webhook/internal/metrics"
+	"external-dns-t-cloud-public-webhook/internal/dns/provider"
+	"external-dns-t-cloud-public-webhook/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"sigs.k8s.io/external-dns/endpoint"
@@ -16,16 +17,32 @@ import (
 )
 
 const (
-	webhookServerAddr = "127.0.0.1:8888"
+	webhookServerAddr = "0.0.0.0:8888"
 	statusServerAddr  = "0.0.0.0:8080"
 )
 
 func main() {
 	var domainFilters []string
+	var zoneType string
 	pflag.StringArrayVar(&domainFilters, "domain-filter", []string{}, "List of domains to work on (can be specified multiple times)")
+	pflag.StringVar(&zoneType, "zone-type", "", "DNS zone visibility to manage: public or private; overrides ZONE_TYPE")
 	pflag.Parse()
 
 	log.SetLevel(log.DebugLevel)
+
+	if zoneType == "" {
+		zoneType = os.Getenv("ZONE_TYPE")
+	}
+	if zoneType == "" {
+		zoneType = os.Getenv("OS_ZONE_TYPE")
+	}
+	if zoneType == "" {
+		zoneType = provider.ZoneTypePublic
+	}
+
+	if !provider.IsSupportedZoneType(zoneType) {
+		log.Fatalf("invalid zone type %q: expected %q or %q", zoneType, provider.ZoneTypePublic, provider.ZoneTypePrivate)
+	}
 
 	startedChan := make(chan struct{})
 	httpApiStarted := false
@@ -61,13 +78,13 @@ func main() {
 	}()
 
 	epf := endpoint.NewDomainFilter(domainFilters)
-	dp, err := provider.NewDesignateProvider(*epf, false)
+	dp, err := provider.NewDNSProvider(*epf, zoneType, false)
 	if err != nil {
-		log.Fatalf("NewDesignateProvider: %v", err)
-		metrics.OpenstackConnectionMetric.Set(0)
+		log.Fatalf("NewDNSProvider: %v", err)
+		metrics.TCloudPublicConnectionMetric.Set(0)
 	}
-	metrics.OpenstackConnectionMetric.Set(1)
-	log.Debugf("Connected to OpenStack API")
+	metrics.TCloudPublicConnectionMetric.Set(1)
+	log.Debugf("Connected to T-Cloud Public API")
 
 	log.Debugf("Starting webhook server on %s", webhookServerAddr)
 	api.StartHTTPApi(dp, startedChan, 0, 0, webhookServerAddr)

@@ -1,4 +1,4 @@
-module external-dns-openstack-webhook
+module external-dns-t-cloud-public-webhook
 
 go 1.26.1
 
@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/gophercloud/gophercloud/v2 v2.11.1
+	github.com/opentelekomcloud/gophertelekomcloud v0.9.5
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/pflag v1.0.10
 )

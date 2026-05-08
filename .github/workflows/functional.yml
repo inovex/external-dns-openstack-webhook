@@ -1,0 +1,146 @@
+name: functional
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: functional-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  OS_CLIENT_CONFIG_FILE: ${{ github.workspace }}/.ci/t-cloud-public/clouds.yaml
+  OS_CLOUD: ${{ secrets.OS_CLOUD }}
+
+jobs:
+  functional:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'functional'))
+    runs-on: ubuntu-latest
+    environment: tcloud-functional
+
+    strategy:
+      fail-fast: false
+      matrix:
+        zone_type: [public, private]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Checkout kubernetes-sigs/external-dns
+        uses: actions/checkout@v6
+        with:
+          repository: kubernetes-sigs/external-dns
+          path: ./external-dns
+          ref: v0.21.0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            ./go.sum
+            ./external-dns/go.sum
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenStack CLI
+        run: python -m pip install --upgrade pip python-openstackclient python-designateclient otcextensions
+
+      - name: Prepare cloud credentials
+        run: bash ./scripts/ci/prepare_cloud_credentials.sh
+        env:
+          OS_CLOUDS_YAML_CONTENT: ${{ secrets.OS_CLOUDS_YAML }}
+
+      - name: Create ephemeral test zone
+        id: zone
+        env:
+          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
+          OS_PUBLIC_ZONE_SUFFIX: ${{ secrets.OS_PUBLIC_ZONE_SUFFIX }}
+          OS_PRIVATE_ZONE_SUFFIX: ${{ secrets.OS_PRIVATE_ZONE_SUFFIX }}
+          OS_PRIVATE_ROUTER_ID: ${{ secrets.OS_PRIVATE_ROUTER_ID }}
+          OS_PRIVATE_ROUTER_REGION: ${{ secrets.OS_PRIVATE_ROUTER_REGION }}
+          OS_ZONE_EMAIL: ${{ secrets.OS_ZONE_EMAIL }}
+        run: python ./scripts/ci/create_test_zone.py
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start webhook from PR package
+        if: github.event_name == 'pull_request'
+        env:
+          IMAGE_TAG: pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
+          ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
+        run: bash ./scripts/ci/start_webhook_pr.sh
+
+      - name: Start webhook from source
+        if: github.event_name != 'pull_request'
+        env:
+          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
+          ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
+        run: bash ./scripts/ci/start_webhook_source.sh
+
+      - name: Wait for webhook health
+        run: bash ./scripts/ci/wait_webhook_health.sh
+
+      - name: Build external-dns
+        run: make build
+        working-directory: ./external-dns
+
+      - name: Start connector source
+        env:
+          ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
+        run: bash ./scripts/ci/start_connector_source.sh
+
+      - name: Run external-dns connector source
+        env:
+          ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
+          TXT_OWNER_ID: ci-${{ github.run_id }}-${{ matrix.zone_type }}
+        run: bash ../scripts/ci/run_external_dns_connector.sh
+        working-directory: ./external-dns
+
+      - name: Wait for DNS changes to settle
+        env:
+          ZONE_ID: ${{ steps.zone.outputs.zone_id }}
+        run: python ./scripts/ci/wait_recordsets.py
+
+      - name: Verify recordsets
+        env:
+          ZONE_ID: ${{ steps.zone.outputs.zone_id }}
+        run: python ./scripts/ci/verify_recordsets.py
+
+      - name: Show webhook log
+        if: always() && github.event_name != 'pull_request'
+        run: cat /tmp/webhook.log
+
+      - name: Show connector source log
+        if: always()
+        run: cat /tmp/connector-source.log
+
+      - name: Show container log
+        if: always() && github.event_name == 'pull_request'
+        run: docker logs webhook
+
+      - name: Cleanup webhook container
+        if: always() && github.event_name == 'pull_request'
+        run: docker rm -f webhook || true
+
+      - name: Cleanup test zone
+        if: always() && steps.zone.outputs.zone_id != ''
+        env:
+          ZONE_ID: ${{ steps.zone.outputs.zone_id }}
+        run: python ./scripts/ci/cleanup_test_zone.py
