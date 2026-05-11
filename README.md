@@ -35,6 +35,8 @@ which provides the T-Cloud Public IAM credentials to the webhook provider.
 `OS_*` environment variables are not supported for configuration, since the use of a `clouds.yaml` file offers more structure, capabilities and allows for better validation.
 The one exception to this is `OS_CLOUD` for setting the name of the cloud in `clouds.yaml` to use.
 
+Note: custom TLS settings from `clouds.yaml`, such as `cacert`, `cert`, `key`, or disabled certificate verification, are not explicitly supported by the current webhook auth bootstrap yet. Environments that rely on private trust roots or client-certificate TLS may require a future dedicated implementation.
+
 By default, the webhook manages public DNS zones. To manage private zones in a container, set:
 
 ```yaml
