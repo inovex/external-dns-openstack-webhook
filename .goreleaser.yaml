@@ -1,21 +1,19 @@
-project_name: external-dns-openstack-webhook
+project_name: external-dns-t-cloud-public-webhook
+
 before:
   hooks:
     - go mod tidy
     - go mod download
 
 builds:
-  - id: external-dns-openstack-webhook
-    dir: .
-    main: ./cmd/webhook/
-    binary: external-dns-openstack-webhook
+  - id: webhook
+    main: ./cmd/webhook
+    binary: external-dns-t-cloud-public-webhook
     env:
-      - CGO_ENABLED=0 # build a static binary without C dependencies
+      - CGO_ENABLED=0
     flags:
       - -v
       - -a
-    ldflags:
-      - -X main.version={{ .Version }} -X main.commit={{ .Commit }}
     goos:
       - darwin
       - freebsd
@@ -34,33 +32,31 @@ builds:
 
 dockers:
   - ids:
-      - external-dns-openstack-webhook
+      - webhook
     image_templates:
-      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64
+      - "{{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-amd64"
     goos: linux
     goarch: amd64
     dockerfile: goreleaser.dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/amd64"
     use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
   - ids:
-      - external-dns-openstack-webhook
+      - webhook
     image_templates:
-      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64
+      - "{{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-arm64"
     goos: linux
     goarch: arm64
     dockerfile: goreleaser.dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/arm64"
     use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
 
 docker_manifests:
-  - name_template: "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}"
+  - name_template: "{{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}"
     image_templates:
-      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "{{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-amd64"
+      - "{{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-arm64"
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
@@ -72,15 +68,11 @@ checksum:
   name_template: "{{ .ProjectName }}-{{ .Version }}_checksums.txt"
   algorithm: sha256
 
-# Configuration for GitHub Releases
 release:
-  github:
-    owner: inovex
-    name: external-dns-openstack-webhook
   footer: |
     ## Docker Images
-    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }} (universal, multi-platform)
-    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-amd64
-    - ghcr.io/inovex/external-dns-openstack-webhook:{{ trimprefix .Tag "v" }}-arm64
+    - {{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}
+    - {{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-amd64
+    - {{ .Env.IMAGE_REPOSITORY }}:{{ .Version }}-arm64
   prerelease: auto
   replace_existing_draft: true
