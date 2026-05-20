@@ -37,15 +37,15 @@ The one exception to this is `OS_CLOUD` for setting the name of the cloud in `cl
 
 Note: custom TLS settings from `clouds.yaml`, such as `cacert`, `cert`, `key`, or disabled certificate verification, are not explicitly supported by the current webhook auth bootstrap yet. Environments that rely on private trust roots or client-certificate TLS may require a future dedicated implementation.
 
-By default, the webhook manages public DNS zones. To manage private zones in a container, set:
+By default, endpoints are created in public DNS zones. To target a private zone for a specific Kubernetes object, set the provider-specific annotation:
 
 ```yaml
-env:
-  - name: ZONE_TYPE
-    value: private
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/webhook/zone-type: private
 ```
 
-Supported values are `public` and `private`. The `--zone-type` flag is still available and overrides `ZONE_TYPE`.
+Supported values are `public` and `private`. If the annotation is omitted, `public` is used.
 
 The following example is a basic example of a `clouds.yaml` file, using `t-cloud-public` as the cloud name (the default used by this webhook):
 
@@ -84,8 +84,4 @@ You can then start the webhook server using:
 go run cmd/webhook/main.go
 ```
 
-For private zones, run:
-
-```sh
-ZONE_TYPE=private go run cmd/webhook/main.go
-```
+Private-zone selection is controlled through endpoint annotations, so the local webhook command is the same for public and private zones.

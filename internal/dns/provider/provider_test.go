@@ -42,7 +42,8 @@ func generateDNSID() string {
 }
 
 type fakeDNSClient struct {
-	managedZones map[string]*struct {
+	listedZoneTypes []string
+	managedZones    map[string]*struct {
 		zone       *zones.Zone
 		recordSets map[string]*recordsets.RecordSet
 	}
@@ -62,8 +63,12 @@ func (c fakeDNSClient) AddZone(ctx context.Context, zone zones.Zone) string {
 	return zone.ID
 }
 
-func (c fakeDNSClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
+func (c *fakeDNSClient) ForEachZone(ctx context.Context, zoneType string, handler func(zone *zones.Zone) error) error {
+	c.listedZoneTypes = append(c.listedZoneTypes, zoneType)
 	for _, zone := range c.managedZones {
+		if zoneType != "" && zone.zone.ZoneType != zoneType {
+			continue
+		}
 		if err := handler(zone.zone); err != nil {
 			return err
 		}
@@ -127,21 +132,16 @@ func (c fakeDNSClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetID 
 	return nil
 }
 
-func (c fakeDNSClient) ToProvider() provider.Provider {
-	return c.ToProviderWithZoneType(ZoneTypePublic)
-}
-
-func (c fakeDNSClient) ToProviderWithZoneType(zoneType string) provider.Provider {
+func (c *fakeDNSClient) ToProvider() provider.Provider {
 	return &dnsProvider{
 		client:       c,
 		domainFilter: endpoint.DomainFilter{},
-		zoneType:     zoneType,
 	}
 }
 
 func newFakeDNSClient() *fakeDNSClient {
 	return &fakeDNSClient{
-		make(map[string]*struct {
+		managedZones: make(map[string]*struct {
 			zone       *zones.Zone
 			recordSets map[string]*recordsets.RecordSet
 		}),
@@ -271,7 +271,7 @@ clouds:
 	os.Setenv("OS_CLIENT_CONFIG_FILE", tmpcloudsyaml.Name())
 	os.Setenv("OS_CLOUD", "unittest")
 
-	if _, err := NewDNSProvider(endpoint.DomainFilter{}, ZoneTypePublic, true); err != nil {
+	if _, err := NewDNSProvider(endpoint.DomainFilter{}, true); err != nil {
 		t.Fatalf("Failed to initialize DNS provider: %s", err)
 	}
 }
@@ -330,6 +330,7 @@ func TestDNSRecords(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     rs11ID,
 				dnsZoneID:          zone1ID,
+				dnsZoneType:        ZoneTypePublic,
 				dnsOriginalRecords: "10.1.1.1",
 			},
 		},
@@ -340,6 +341,7 @@ func TestDNSRecords(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     rs12ID,
 				dnsZoneID:          zone1ID,
+				dnsZoneType:        ZoneTypePublic,
 				dnsOriginalRecords: "text1",
 			},
 		},
@@ -351,6 +353,7 @@ func TestDNSRecords(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     rs14ID,
 				dnsZoneID:          zone1ID,
+				dnsZoneType:        ZoneTypePublic,
 				dnsOriginalRecords: "10.1.1.2",
 			},
 		},
@@ -361,6 +364,7 @@ func TestDNSRecords(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     rs21ID,
 				dnsZoneID:          zone2ID,
+				dnsZoneType:        ZoneTypePublic,
 				dnsOriginalRecords: "10.2.1.1\00010.2.1.2",
 			},
 		},
@@ -371,6 +375,7 @@ func TestDNSRecords(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     rs22ID,
 				dnsZoneID:          zone2ID,
+				dnsZoneType:        ZoneTypePublic,
 				dnsOriginalRecords: "sql.test.net.",
 			},
 		},
@@ -379,6 +384,9 @@ func TestDNSRecords(t *testing.T) {
 	endpoints, err := client.ToProvider().Records(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(client.listedZoneTypes, []string{ZoneTypePublic, ZoneTypePrivate}) {
+		t.Fatalf("unexpected zone list requests: got=%v want=%v", client.listedZoneTypes, []string{ZoneTypePublic, ZoneTypePrivate})
 	}
 out:
 	for _, ep := range endpoints {
@@ -423,7 +431,12 @@ func TestDNSRecordsPrivateZones(t *testing.T) {
 		Records: []string{"198.51.100.5"},
 	})
 
-	endpoints, err := client.ToProviderWithZoneType(ZoneTypePrivate).Records(context.Background())
+	publicRecordID := ""
+	for _, rs := range client.managedZones[publicZoneID].recordSets {
+		publicRecordID = rs.ID
+	}
+
+	endpoints, err := client.ToProvider().Records(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,13 +449,41 @@ func TestDNSRecordsPrivateZones(t *testing.T) {
 			Labels: map[string]string{
 				dnsRecordSetID:     privateRecordID,
 				dnsZoneID:          privateZoneID,
+				dnsZoneType:        ZoneTypePrivate,
 				dnsOriginalRecords: "10.10.0.5",
+			},
+			ProviderSpecific: endpoint.ProviderSpecific{
+				{
+					Name:  zoneTypeProviderSpecificKey,
+					Value: ZoneTypePrivate,
+				},
+			},
+		},
+		{
+			DNSName:    "api.example.internal",
+			RecordType: endpoint.RecordTypeA,
+			Targets:    endpoint.Targets{"198.51.100.5"},
+			Labels: map[string]string{
+				dnsRecordSetID:     publicRecordID,
+				dnsZoneID:          publicZoneID,
+				dnsZoneType:        ZoneTypePublic,
+				dnsOriginalRecords: "198.51.100.5",
 			},
 		},
 	}
 
-	if !reflect.DeepEqual(endpoints, expected) {
-		t.Fatalf("unexpected private zone records: got=%v want=%v", endpoints, expected)
+out:
+	for _, ep := range endpoints {
+		for i, ex := range expected {
+			if reflect.DeepEqual(ep, ex) {
+				expected = append(expected[:i], expected[i+1:]...)
+				continue out
+			}
+		}
+		t.Errorf("unexpected endpoint %s/%s (TTL: %d) -> %s", ep.DNSName, ep.RecordType, ep.RecordTTL, ep.Targets)
+	}
+	if len(expected) != 0 {
+		t.Errorf("not all expected endpoints were returned. Remained: %v", expected)
 	}
 }
 
@@ -474,10 +515,16 @@ func TestDNSCreateRecordsPrivateZones(t *testing.T) {
 			RecordType: endpoint.RecordTypeA,
 			Targets:    endpoint.Targets{"10.0.0.7"},
 			Labels:     map[string]string{},
+			ProviderSpecific: endpoint.ProviderSpecific{
+				{
+					Name:  zoneTypeProviderSpecificKey,
+					Value: ZoneTypePrivate,
+				},
+			},
 		},
 	}
 
-	err := client.ToProviderWithZoneType(ZoneTypePrivate).ApplyChanges(context.Background(), &plan.Changes{Create: endpoints})
+	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{Create: endpoints})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,6 +544,66 @@ func TestDNSCreateRecordsPrivateZones(t *testing.T) {
 			t.Fatalf("unexpected private record-set created: %+v", rs)
 		}
 	}
+}
+
+func TestDNSCreateRecordsPublicAndPrivateSameName(t *testing.T) {
+	client := newFakeDNSClient()
+	ctx := context.TODO()
+
+	publicZoneID := client.AddZone(ctx, zones.Zone{
+		ID:       "public-zone",
+		Name:     "example.internal.",
+		ZoneType: ZoneTypePublic,
+		Status:   "ACTIVE",
+	})
+	privateZoneID := client.AddZone(ctx, zones.Zone{
+		ID:       "private-zone",
+		Name:     "example.internal.",
+		ZoneType: ZoneTypePrivate,
+		Status:   "ACTIVE",
+	})
+
+	endpoints := []*endpoint.Endpoint{
+		{
+			DNSName:    "api.example.internal",
+			RecordType: endpoint.RecordTypeA,
+			Targets:    endpoint.Targets{"198.51.100.7"},
+			Labels:     map[string]string{},
+		},
+		{
+			DNSName:    "api.example.internal",
+			RecordType: endpoint.RecordTypeA,
+			Targets:    endpoint.Targets{"10.0.0.7"},
+			Labels:     map[string]string{},
+			ProviderSpecific: endpoint.ProviderSpecific{
+				{
+					Name:  zoneTypeProviderSpecificKey,
+					Value: ZoneTypePrivate,
+				},
+			},
+		},
+	}
+
+	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{Create: endpoints})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertZoneRecordSet := func(zoneID string, wantRecords []string) {
+		t.Helper()
+		zone := client.managedZones[zoneID]
+		if len(zone.recordSets) != 1 {
+			t.Fatalf("expected one record-set in zone %s, got %d", zoneID, len(zone.recordSets))
+		}
+		for _, rs := range zone.recordSets {
+			if rs.Name != "api.example.internal." || rs.Type != endpoint.RecordTypeA || !reflect.DeepEqual(rs.Records, wantRecords) {
+				t.Fatalf("unexpected record-set in zone %s: %+v", zoneID, rs)
+			}
+		}
+	}
+
+	assertZoneRecordSet(publicZoneID, []string{"198.51.100.7"})
+	assertZoneRecordSet(privateZoneID, []string{"10.0.0.7"})
 }
 
 func testDNSCreateRecords(t *testing.T, client *fakeDNSClient) []*recordsets.RecordSet {
@@ -602,7 +709,7 @@ func testDNSCreateRecords(t *testing.T, client *fakeDNSClient) []*recordsets.Rec
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, "", func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			id := recordSet.ID
 			recordSet.ID = ""
@@ -694,7 +801,7 @@ func testDNSUpdateRecords(t *testing.T, client *fakeDNSClient) []*recordsets.Rec
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, "", func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)
@@ -754,7 +861,7 @@ func testDNSDeleteRecords(t *testing.T, client *fakeDNSClient) {
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, "", func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)
@@ -821,9 +928,9 @@ func TestGetHostZoneID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zoneMap := map[string]string{}
+			zoneMap := map[string]managedZone{}
 			for _, zone := range tt.zones {
-				zoneMap[zone] = zone
+				zoneMap[zone] = managedZone{name: zone}
 			}
 			got := getHostZoneID(tt.hostname, zoneMap)
 			if got != tt.want {

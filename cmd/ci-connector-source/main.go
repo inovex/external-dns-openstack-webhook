@@ -11,7 +11,11 @@ import (
 	"sigs.k8s.io/external-dns/endpoint"
 )
 
-const endpointCount = 10
+const (
+	endpointCount               = 10
+	zoneTypePrivate             = "private"
+	zoneTypeProviderSpecificKey = "webhook/zone-type"
+)
 
 func main() {
 	addr := getenv("CONNECTOR_SOURCE_SERVER", "127.0.0.1:18080")
@@ -52,11 +56,21 @@ func main() {
 }
 
 func buildEndpoints(zoneName string) []*endpoint.Endpoint {
+	zoneType := os.Getenv("MATRIX_ZONE_TYPE")
 	endpoints := make([]*endpoint.Endpoint, 0, endpointCount)
 	for i := 0; i < endpointCount; i++ {
 		name := fmt.Sprintf("ci-%02d.%s", i+1, zoneName)
 		target := fmt.Sprintf("192.0.2.%d", i+1)
-		endpoints = append(endpoints, endpoint.NewEndpoint(name, endpoint.RecordTypeA, target))
+		ep := endpoint.NewEndpoint(name, endpoint.RecordTypeA, target)
+		if zoneType == zoneTypePrivate {
+			ep.ProviderSpecific = endpoint.ProviderSpecific{
+				{
+					Name:  zoneTypeProviderSpecificKey,
+					Value: zoneTypePrivate,
+				},
+			}
+		}
+		endpoints = append(endpoints, ep)
 	}
 	return endpoints
 }

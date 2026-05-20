@@ -83,14 +83,12 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           IMAGE_TAG: pr-${{ github.event.pull_request.number }}-${{ github.sha }}
-          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
           ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
         run: bash ./scripts/ci/start_webhook_pr.sh
 
       - name: Start webhook from source
         if: github.event_name != 'pull_request'
         env:
-          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
           ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
         run: bash ./scripts/ci/start_webhook_source.sh
 
@@ -104,6 +102,7 @@ jobs:
       - name: Start connector source
         env:
           ZONE_NAME: ${{ steps.zone.outputs.zone_name }}
+          MATRIX_ZONE_TYPE: ${{ matrix.zone_type }}
         run: bash ./scripts/ci/start_connector_source.sh
 
       - name: Run external-dns connector source

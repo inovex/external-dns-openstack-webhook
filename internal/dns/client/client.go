@@ -35,7 +35,7 @@ import (
 // interface between provider and DNS API
 type DNSClientInterface interface {
 	// ForEachZone calls handler for each managed zone
-	ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error
+	ForEachZone(ctx context.Context, zoneType string, handler func(zone *zones.Zone) error) error
 
 	// ForEachRecordSet calls handler for each recordset in the given DNS zone
 	ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error
@@ -53,16 +53,15 @@ type DNSClientInterface interface {
 // implementation of the DNSClientInterface
 type dnsClient struct {
 	serviceClient *golangsdk.ServiceClient
-	zoneType      string
 }
 
 // factory function for the DNSClientInterface
-func NewDNSClient(zoneType string) (DNSClientInterface, error) {
+func NewDNSClient() (DNSClientInterface, error) {
 	serviceClient, err := createDNSServiceClient()
 	if err != nil {
 		return nil, err
 	}
-	return &dnsClient{serviceClient: serviceClient, zoneType: zoneType}, nil
+	return &dnsClient{serviceClient: serviceClient}, nil
 }
 
 // authenticate in T-Cloud Public and obtain DNS service endpoint
@@ -95,12 +94,12 @@ func createDNSServiceClient() (*golangsdk.ServiceClient, error) {
 }
 
 // ForEachZone calls handler for each managed zone
-func (c dnsClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
+func (c dnsClient) ForEachZone(ctx context.Context, zoneType string, handler func(zone *zones.Zone) error) error {
 	startTime := time.Now()
 
 	listOpts := zones.ListOpts{}
-	if c.zoneType != "" {
-		listOpts.Type = c.zoneType
+	if zoneType != "" {
+		listOpts.Type = zoneType
 	}
 	pager := zones.List(c.serviceClient, listOpts)
 	var pageCount int

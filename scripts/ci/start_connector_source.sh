@@ -8,8 +8,19 @@ fi
 
 connector_addr="${CONNECTOR_SOURCE_SERVER:-127.0.0.1:18080}"
 
+if [[ "${FOREGROUND:-}" == "1" ]]; then
+  echo "Starting connector source on ${connector_addr} in foreground"
+  exec env \
+    ZONE_NAME="${ZONE_NAME}" \
+    MATRIX_ZONE_TYPE="${MATRIX_ZONE_TYPE:-}" \
+    CONNECTOR_SOURCE_SERVER="${connector_addr}" \
+    GOCACHE="${PWD}/.gocache" \
+    go run ./cmd/ci-connector-source
+fi
+
 nohup env \
   ZONE_NAME="${ZONE_NAME}" \
+  MATRIX_ZONE_TYPE="${MATRIX_ZONE_TYPE:-}" \
   CONNECTOR_SOURCE_SERVER="${connector_addr}" \
   GOCACHE="${PWD}/.gocache" \
   go run ./cmd/ci-connector-source \

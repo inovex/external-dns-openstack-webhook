@@ -42,11 +42,17 @@ const (
 	dnsRecordSetID = "dns-recordset-id"
 	// Zone ID of the RecordSet
 	dnsZoneID = "dns-zone-id"
+	// Zone Type of the RecordSet
+	dnsZoneType = "dns-zone-type"
 
 	// Initial records values of the RecordSet. This label is required in order not to loose records that haven't
 	// changed where there are several targets per domain and only some of them changed.
 	// Values are joined by zero-byte to in order to get a single string
 	dnsOriginalRecords = "dns-original-records"
+
+	// Provider-specific key. In Kubernetes manifests this is set through the
+	// external-dns.alpha.kubernetes.io/webhook/zone-type annotation.
+	zoneTypeProviderSpecificKey = "webhook/zone-type"
 )
 
 // dns provider type
@@ -56,20 +62,23 @@ type dnsProvider struct {
 
 	// only consider hosted zones managing domains ending in this suffix
 	domainFilter endpoint.DomainFilter
-	zoneType     string
 	dryRun       bool
 }
 
+type managedZone struct {
+	name     string
+	zoneType string
+}
+
 // NewDNSProvider is a factory function for T-Cloud Public DNS providers
-func NewDNSProvider(domainFilter endpoint.DomainFilter, zoneType string, dryRun bool) (provider.Provider, error) {
-	c, err := client.NewDNSClient(zoneType)
+func NewDNSProvider(domainFilter endpoint.DomainFilter, dryRun bool) (provider.Provider, error) {
+	c, err := client.NewDNSClient()
 	if err != nil {
 		return nil, err
 	}
 	return &dnsProvider{
 		client:       c,
 		domainFilter: domainFilter,
-		zoneType:     zoneType,
 		dryRun:       dryRun,
 	}, nil
 }
@@ -110,13 +119,13 @@ func canonicalizeDomainName(d string) string {
 	return strings.ToLower(d)
 }
 
-// returns ZoneID -> ZoneName mapping for zones that match domain filter
-func (p dnsProvider) getZones(ctx context.Context) (map[string]string, error) {
-	result := map[string]string{}
+// returns ZoneID -> zone metadata mapping for zones that match domain filter
+func (p dnsProvider) getZones(ctx context.Context, zoneType string) (map[string]managedZone, error) {
+	result := map[string]managedZone{}
 
-	err := p.client.ForEachZone(ctx,
+	err := p.client.ForEachZone(ctx, zoneType,
 		func(zone *zones.Zone) error {
-			if zone.Status == "DELETE" || !zoneMatchesVisibility(zone, p.zoneType) {
+			if zone.Status == "DELETE" || !zoneMatchesVisibility(zone, zoneType) {
 				return nil
 			}
 
@@ -124,7 +133,7 @@ func (p dnsProvider) getZones(ctx context.Context) (map[string]string, error) {
 			if !p.domainFilter.Match(zoneName) {
 				return nil
 			}
-			result[zone.ID] = zoneName
+			result[zone.ID] = managedZone{name: zoneName, zoneType: strings.ToLower(zone.ZoneType)}
 			return nil
 		},
 	)
@@ -132,12 +141,27 @@ func (p dnsProvider) getZones(ctx context.Context) (map[string]string, error) {
 	return result, err
 }
 
-// finds best suitable DNS zone for the hostname
-func getHostZoneID(hostname string, managedZones map[string]string) string {
+func getEndpointZoneType(ep *endpoint.Endpoint) (string, error) {
+	zoneType := ZoneTypePublic
+	if value, ok := ep.GetProviderSpecificProperty(zoneTypeProviderSpecificKey); ok {
+		zoneType = strings.ToLower(strings.TrimSpace(value))
+	} else if value, ok := ep.Labels[dnsZoneType]; ok {
+		zoneType = strings.ToLower(strings.TrimSpace(value))
+	}
+
+	if IsSupportedZoneType(zoneType) {
+		return zoneType, nil
+	}
+	return "", fmt.Errorf("invalid %s: %q (allowed: %s, %s)", zoneTypeProviderSpecificKey, zoneType, ZoneTypePublic, ZoneTypePrivate)
+}
+
+// finds the best suitable DNS zone for the hostname
+func getHostZoneID(hostname string, managedZones map[string]managedZone) string {
 	longestZoneLength := 0
 	resultID := ""
 
-	for zoneID, zoneName := range managedZones {
+	for zoneID, zone := range managedZones {
+		zoneName := zone.name
 		if !strings.HasSuffix(hostname, "."+zoneName) && hostname != zoneName {
 			continue
 		}
@@ -154,28 +178,40 @@ func getHostZoneID(hostname string, managedZones map[string]string) string {
 // Records returns the list of records.
 func (p dnsProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, error) {
 	var result []*endpoint.Endpoint
-	managedZones, err := p.getZones(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for zoneID := range managedZones {
-		err = p.client.ForEachRecordSet(ctx, zoneID,
-			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
-					return nil
-				}
 
-				ep := endpoint.NewEndpointWithTTL(recordSet.Name, recordSet.Type, endpoint.TTL(recordSet.TTL), recordSet.Records...)
-				ep.Labels[dnsRecordSetID] = recordSet.ID
-				ep.Labels[dnsZoneID] = recordSet.ZoneID
-				ep.Labels[dnsOriginalRecords] = strings.Join(recordSet.Records, "\000")
-				result = append(result, ep)
-
-				return nil
-			},
-		)
+	for _, zoneType := range []string{ZoneTypePublic, ZoneTypePrivate} {
+		managedZones, err := p.getZones(ctx, zoneType)
 		if err != nil {
 			return nil, err
+		}
+		for zoneID, zone := range managedZones {
+			err = p.client.ForEachRecordSet(ctx, zoneID,
+				func(recordSet *recordsets.RecordSet) error {
+					if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
+						return nil
+					}
+
+					ep := endpoint.NewEndpointWithTTL(recordSet.Name, recordSet.Type, endpoint.TTL(recordSet.TTL), recordSet.Records...)
+					ep.Labels[dnsRecordSetID] = recordSet.ID
+					ep.Labels[dnsZoneID] = recordSet.ZoneID
+					ep.Labels[dnsZoneType] = zone.zoneType
+					ep.Labels[dnsOriginalRecords] = strings.Join(recordSet.Records, "\000")
+					if zone.zoneType == ZoneTypePrivate {
+						ep.ProviderSpecific = endpoint.ProviderSpecific{
+							{
+								Name:  zoneTypeProviderSpecificKey,
+								Value: zone.zoneType,
+							},
+						}
+					}
+					result = append(result, ep)
+
+					return nil
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -190,17 +226,23 @@ type recordSet struct {
 	recordSetID string
 	ttl         int
 	names       map[string]bool
+	zoneType    string
 }
 
 // adds endpoint into recordset aggregation, loading original values from endpoint labels first
-func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEndpoints []*endpoint.Endpoint, delete bool) {
-	key := fmt.Sprintf("%s/%s", ep.DNSName, ep.RecordType)
+func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEndpoints []*endpoint.Endpoint, delete bool) error {
+	zoneType, err := getEndpointZoneType(ep)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("%s/%s/%s", ep.DNSName, ep.RecordType, zoneType)
 	rs := recordSets[key]
 	if rs == nil {
 		rs = &recordSet{
 			dnsName:    canonicalizeDomainName(ep.DNSName),
 			recordType: ep.RecordType,
 			names:      make(map[string]bool),
+			zoneType:   zoneType,
 		}
 	}
 
@@ -226,6 +268,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 		rs.names[t] = !delete
 	}
 	recordSets[key] = rs
+	return nil
 }
 
 // addDNSIDLabelsFromExistingEndpoints adds the labels identified by the constants dnsZoneID and dnsRecordSetID
@@ -235,29 +278,37 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 func addDNSIDLabelsFromExistingEndpoints(existingEndpoints []*endpoint.Endpoint, ep *endpoint.Endpoint) {
 	_, hasZoneIDLabel := ep.Labels[dnsZoneID]
 	_, hasRecordSetIDLabel := ep.Labels[dnsRecordSetID]
-	if hasZoneIDLabel && hasRecordSetIDLabel {
+	_, hasZoneTypeLabel := ep.Labels[dnsZoneType]
+	if hasZoneIDLabel && hasRecordSetIDLabel && hasZoneTypeLabel {
+		return
+	}
+	desiredZoneType, err := getEndpointZoneType(ep)
+	if err != nil {
 		return
 	}
 	for _, oep := range existingEndpoints {
-		if ep.RecordType == oep.RecordType && ep.DNSName == oep.DNSName {
-			if !hasZoneIDLabel {
-				ep.Labels[dnsZoneID] = oep.Labels[dnsZoneID]
-			}
-			if !hasRecordSetIDLabel {
-				ep.Labels[dnsRecordSetID] = oep.Labels[dnsRecordSetID]
-			}
-			return
+		existingZoneType, err := getEndpointZoneType(oep)
+		if err != nil {
+			continue
 		}
+		if ep.RecordType != oep.RecordType || ep.DNSName != oep.DNSName || desiredZoneType != existingZoneType {
+			continue
+		}
+		if !hasZoneIDLabel {
+			ep.Labels[dnsZoneID] = oep.Labels[dnsZoneID]
+		}
+		if !hasRecordSetIDLabel {
+			ep.Labels[dnsRecordSetID] = oep.Labels[dnsRecordSetID]
+		}
+		if !hasZoneTypeLabel {
+			ep.Labels[dnsZoneType] = oep.Labels[dnsZoneType]
+		}
+		return
 	}
 }
 
 // ApplyChanges applies a given set of changes in a given zone.
 func (p dnsProvider) ApplyChanges(ctx context.Context, changes *plan.Changes) error {
-	managedZones, err := p.getZones(ctx)
-	if err != nil {
-		return err
-	}
-
 	endpoints, err := p.Records(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch active records: %w", err)
@@ -265,19 +316,40 @@ func (p dnsProvider) ApplyChanges(ctx context.Context, changes *plan.Changes) er
 
 	recordSets := map[string]*recordSet{}
 	for _, ep := range changes.Create {
-		addEndpoint(ep, recordSets, endpoints, false)
+		if err := addEndpoint(ep, recordSets, endpoints, false); err != nil {
+			return err
+		}
 	}
 	for _, ep := range changes.UpdateOld {
-		addEndpoint(ep, recordSets, endpoints, true)
+		if err := addEndpoint(ep, recordSets, endpoints, true); err != nil {
+			return err
+		}
 	}
 	for _, ep := range changes.UpdateNew {
-		addEndpoint(ep, recordSets, endpoints, false)
+		if err := addEndpoint(ep, recordSets, endpoints, false); err != nil {
+			return err
+		}
 	}
 	for _, ep := range changes.Delete {
-		addEndpoint(ep, recordSets, endpoints, true)
+		if err := addEndpoint(ep, recordSets, endpoints, true); err != nil {
+			return err
+		}
 	}
 
+	managedZonesByType := map[string]map[string]managedZone{}
 	for _, rs := range recordSets {
+		managedZones := managedZonesByType[rs.zoneType]
+		if managedZones == nil {
+			var err2 error
+			managedZones, err2 = p.getZones(ctx, rs.zoneType)
+			if err2 != nil {
+				if err == nil {
+					err = err2
+				}
+				continue
+			}
+			managedZonesByType[rs.zoneType] = managedZones
+		}
 		if err2 := p.upsertRecordSet(ctx, rs, managedZones); err == nil {
 			err = err2
 		}
@@ -286,7 +358,7 @@ func (p dnsProvider) ApplyChanges(ctx context.Context, changes *plan.Changes) er
 }
 
 // apply recordset changes by inserting/updating/deleting recordsets
-func (p dnsProvider) upsertRecordSet(ctx context.Context, rs *recordSet, managedZones map[string]string) error {
+func (p dnsProvider) upsertRecordSet(ctx context.Context, rs *recordSet, managedZones map[string]managedZone) error {
 	if rs.zoneID == "" {
 		rs.zoneID = getHostZoneID(rs.dnsName, managedZones)
 		if rs.zoneID == "" {
