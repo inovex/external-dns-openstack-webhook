@@ -46,8 +46,10 @@ jobs:
         working-directory: ./external-dns
 
       - name: Configure devstack
+        working-directory: ./devstack
+        shell: bash
         run: |
-          cat <<EOF > local.conf
+          cat <<EOF | tee local.conf
           [[local|localrc]]
           ADMIN_PASSWORD=secret
           DATABASE_PASSWORD=root
@@ -63,8 +65,6 @@ jobs:
           enable_plugin designate https://opendev.org/openstack/designate stable/2025.2
           enable_service designate,designate-central,designate-api,designate-zone-manager,designate-mdns,designate-worker,designate-producer
           EOF
-        working-directory: ./devstack
-        shell: bash
 
       - name: Run stack.sh
         run: ./stack.sh
@@ -76,20 +76,87 @@ jobs:
       - name: Create zones example.com
         run: |
           openstack zone create --email admin@example.com example.com.
+          openstack zone create --email admin@example.com ishallnotbeusedbywebhook.test.
 
       - name: Wait for zone creation
         run: |
           while [ "$(openstack zone list -f csv | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
 
-      - name: Start external-dns-openstack-webhook in background
+      - name: Create application credential with access rules and write clouds.yaml for external-dns-openstack-webhook
+        shell: bash
+        working-directory: ./build/bin/
         run: |
-          ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
+          # https://docs.openstack.org/python-openstackclient/latest/cli/authentication.html
+          ZONE_ID_EXAMPLE_COM=$(openstack zone list --name example.com. -f value -c id)
+
+          cat <<EOF | tee openstack-access-rules.json
+            [
+                {
+                    "method": "GET",
+                    "path": "/v2/zones",
+                    "service": "dns"
+                },
+                {
+                    "method": "GET",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}",
+                    "service": "dns"
+                },
+                {
+                    "method": "GET",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}/recordsets",
+                    "service": "dns"
+                },
+                {
+                    "method": "GET",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}/recordsets/*",
+                    "service": "dns"
+                },
+                {
+                    "method": "POST",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}/recordsets",
+                    "service": "dns"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}/recordsets/*",
+                    "service": "dns"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/v2/zones/${ZONE_ID_EXAMPLE_COM}/recordsets/*",
+                    "service": "dns"
+                }
+            ]
+          EOF
+
+          readarray -t lines <<< $(openstack application credential create external-dns-webhook --access-rules openstack-access-rules.json -f value -c id -c secret)
+          APP_CRED_ID=${lines[0]}
+          APP_CRED_SECRET=${lines[1]}
+
+          cat <<EOF | tee clouds.yaml
+            clouds:
+              external-dns-webhook:
+                auth:
+                  auth_url: http://127.0.0.1/identity
+                  application_credential_id: ${APP_CRED_ID}
+                  application_credential_secret: ${APP_CRED_SECRET}
+                auth_type: v3applicationcredential
+          EOF
+
+      - name: Start external-dns-openstack-webhook in background
+        working-directory: ./build/bin/
+        run: |
+          echo "This is the clouds.yaml used by the webhook ..."
+          cat clouds.yaml
+          echo "Starting webhook now  ..."
+          OS_CLOUD=external-dns-webhook ./external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
 
       - name: Run external-dns
-        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
         working-directory: ./external-dns
+        run: ./build/external-dns --domain-filter example.com. --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
 
       - name: Show /tmp/external-dns-openstack-webhook.log
+        if: success() || failure()  # we want to see the logs of the webhook especially when things dont work
         run: cat /tmp/external-dns-openstack-webhook.log
 
       - name: Wait for PENDING
