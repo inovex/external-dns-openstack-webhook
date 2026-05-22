@@ -606,6 +606,121 @@ func TestDNSCreateRecordsPublicAndPrivateSameName(t *testing.T) {
 	assertZoneRecordSet(privateZoneID, []string{"10.0.0.7"})
 }
 
+func TestAdjustEndpointsNormalizesZoneType(t *testing.T) {
+	provider := dnsProvider{}
+
+	endpoints := []*endpoint.Endpoint{
+		endpoint.NewEndpoint("public.example.com", endpoint.RecordTypeA, "192.0.2.1").
+			WithProviderSpecific(zoneTypeProviderSpecificKey, ZoneTypePublic),
+		endpoint.NewEndpoint("private.example.com", endpoint.RecordTypeA, "10.0.0.1").
+			WithProviderSpecific(zoneTypeProviderSpecificKey, "PRIVATE"),
+		endpoint.NewEndpoint("default.example.com", endpoint.RecordTypeA, "192.0.2.2"),
+	}
+
+	got, err := provider.AdjustEndpoints(endpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := got[0].GetProviderSpecificProperty(zoneTypeProviderSpecificKey); ok {
+		t.Fatalf("explicit public zone type should be removed: %+v", got[0].ProviderSpecific)
+	}
+
+	value, ok := got[1].GetProviderSpecificProperty(zoneTypeProviderSpecificKey)
+	if !ok || value != ZoneTypePrivate {
+		t.Fatalf("private zone type should be preserved and normalized: got=%q ok=%v", value, ok)
+	}
+
+	if _, ok := got[2].GetProviderSpecificProperty(zoneTypeProviderSpecificKey); ok {
+		t.Fatalf("default public endpoint should not gain provider-specific zone type: %+v", got[2].ProviderSpecific)
+	}
+}
+
+func TestAdjustEndpointsRejectsInvalidZoneType(t *testing.T) {
+	provider := dnsProvider{}
+	endpoints := []*endpoint.Endpoint{
+		endpoint.NewEndpoint("invalid.example.com", endpoint.RecordTypeA, "192.0.2.1").
+			WithProviderSpecific(zoneTypeProviderSpecificKey, "internal"),
+	}
+
+	if _, err := provider.AdjustEndpoints(endpoints); err == nil {
+		t.Fatal("expected invalid zone type error")
+	}
+}
+
+func TestDNSCreateCNAMEWithFQDNTarget(t *testing.T) {
+	client := newFakeDNSClient()
+	ctx := context.TODO()
+
+	zoneID := client.AddZone(ctx, zones.Zone{
+		ID:       "zone-1",
+		Name:     "example.com.",
+		ZoneType: ZoneTypePublic,
+		Status:   "ACTIVE",
+	})
+
+	endpoints := []*endpoint.Endpoint{
+		{
+			DNSName:    "db.example.com",
+			RecordType: endpoint.RecordTypeCNAME,
+			Targets:    endpoint.Targets{"target.example.com."},
+			Labels:     map[string]string{},
+		},
+	}
+
+	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{Create: endpoints})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zone := client.managedZones[zoneID]
+	if len(zone.recordSets) != 1 {
+		t.Fatalf("expected one record-set, got %d", len(zone.recordSets))
+	}
+	for _, rs := range zone.recordSets {
+		if rs.Name != "db.example.com." || rs.Type != endpoint.RecordTypeCNAME || !reflect.DeepEqual(rs.Records, []string{"target.example.com."}) {
+			t.Fatalf("unexpected CNAME record-set: %+v", rs)
+		}
+	}
+}
+
+func TestDNSCreateRecordWithNilLabels(t *testing.T) {
+	client := newFakeDNSClient()
+	ctx := context.TODO()
+
+	zoneID := client.AddZone(ctx, zones.Zone{
+		ID:       "zone-1",
+		Name:     "example.com.",
+		ZoneType: ZoneTypePublic,
+		Status:   "ACTIVE",
+	})
+
+	endpoints := []*endpoint.Endpoint{
+		{
+			DNSName:    "api.example.com",
+			RecordType: endpoint.RecordTypeA,
+			Targets:    endpoint.Targets{"192.0.2.1"},
+		},
+	}
+
+	err := client.ToProvider().ApplyChanges(context.Background(), &plan.Changes{Create: endpoints})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zone := client.managedZones[zoneID]
+	if len(zone.recordSets) != 1 {
+		t.Fatalf("expected one record-set, got %d", len(zone.recordSets))
+	}
+}
+
+func TestEffectiveZoneTypeFallsBackToRequestedZoneType(t *testing.T) {
+	got := effectiveZoneType(&zones.Zone{}, ZoneTypePrivate)
+	if got != ZoneTypePrivate {
+		t.Fatalf("got=%s want=%s", got, ZoneTypePrivate)
+	}
+}
+
 func testDNSCreateRecords(t *testing.T, client *fakeDNSClient) []*recordsets.RecordSet {
 	ctx := context.TODO()
 	for i, zoneName := range []string{"example.com.", "test.net."} {

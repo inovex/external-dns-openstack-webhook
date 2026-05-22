@@ -19,7 +19,7 @@ provider:
   webhook:
     image:
       repository: ghcr.io/opentelekomcloud/external-dns-t-cloud-public-webhook
-      tag: 2.1.0
+      tag: 1.1.0
     extraVolumeMounts:
       - name: tcloudpubliccloudsyaml
         mountPath: /etc/t-cloud-public/
@@ -42,7 +42,7 @@ By default, endpoints are created in public DNS zones. To target a private zone 
 ```yaml
 metadata:
   annotations:
-    external-dns.alpha.kubernetes.io/webhook/zone-type: private
+    external-dns.alpha.kubernetes.io/webhook-zone-type: private
 ```
 
 Supported values are `public` and `private`. If the annotation is omitted, `public` is used.

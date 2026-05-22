@@ -51,7 +51,7 @@ const (
 	dnsOriginalRecords = "dns-original-records"
 
 	// Provider-specific key. In Kubernetes manifests this is set through the
-	// external-dns.alpha.kubernetes.io/webhook/zone-type annotation.
+	// external-dns.alpha.kubernetes.io/webhook-zone-type annotation.
 	zoneTypeProviderSpecificKey = "webhook/zone-type"
 )
 
@@ -105,8 +105,8 @@ func canonicalizeDomainNames(domains []string) []string {
 	for _, d := range domains {
 		if !strings.HasSuffix(d, ".") {
 			d += "."
-			cDomains = append(cDomains, strings.ToLower(d))
 		}
+		cDomains = append(cDomains, strings.ToLower(d))
 	}
 	return cDomains
 }
@@ -133,12 +133,19 @@ func (p dnsProvider) getZones(ctx context.Context, zoneType string) (map[string]
 			if !p.domainFilter.Match(zoneName) {
 				return nil
 			}
-			result[zone.ID] = managedZone{name: zoneName, zoneType: strings.ToLower(zone.ZoneType)}
+			result[zone.ID] = managedZone{name: zoneName, zoneType: effectiveZoneType(zone, zoneType)}
 			return nil
 		},
 	)
 
 	return result, err
+}
+
+func effectiveZoneType(zone *zones.Zone, requestedZoneType string) string {
+	if zone.ZoneType != "" {
+		return strings.ToLower(zone.ZoneType)
+	}
+	return strings.ToLower(requestedZoneType)
 }
 
 func getEndpointZoneType(ep *endpoint.Endpoint) (string, error) {
@@ -153,6 +160,32 @@ func getEndpointZoneType(ep *endpoint.Endpoint) (string, error) {
 		return zoneType, nil
 	}
 	return "", fmt.Errorf("invalid %s: %q (allowed: %s, %s)", zoneTypeProviderSpecificKey, zoneType, ZoneTypePublic, ZoneTypePrivate)
+}
+
+func (p dnsProvider) AdjustEndpoints(endpoints []*endpoint.Endpoint) ([]*endpoint.Endpoint, error) {
+	for _, ep := range endpoints {
+		zoneTypeValue, ok := ep.GetProviderSpecificProperty(zoneTypeProviderSpecificKey)
+		if !ok {
+			continue
+		}
+
+		zoneType := strings.ToLower(strings.TrimSpace(zoneTypeValue))
+		switch zoneType {
+		case ZoneTypePublic:
+			ep.DeleteProviderSpecificProperty(zoneTypeProviderSpecificKey)
+		case ZoneTypePrivate:
+			ep.SetProviderSpecificProperty(zoneTypeProviderSpecificKey, ZoneTypePrivate)
+		default:
+			return nil, fmt.Errorf("invalid %s: %q (allowed: %s, %s)", zoneTypeProviderSpecificKey, zoneTypeValue, ZoneTypePublic, ZoneTypePrivate)
+		}
+	}
+	return endpoints, nil
+}
+
+func ensureEndpointLabels(ep *endpoint.Endpoint) {
+	if ep.Labels == nil {
+		ep.Labels = endpoint.NewLabels()
+	}
 }
 
 // finds the best suitable DNS zone for the hostname
@@ -231,6 +264,8 @@ type recordSet struct {
 
 // adds endpoint into recordset aggregation, loading original values from endpoint labels first
 func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEndpoints []*endpoint.Endpoint, delete bool) error {
+	ensureEndpointLabels(ep)
+
 	zoneType, err := getEndpointZoneType(ep)
 	if err != nil {
 		return err
@@ -276,6 +311,8 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 // value. If the given Endpoint already has the labels set, they are left untouched. This fixes an issue with the
 // TXTRegistry which generates new TXT entries instead of updating the old ones.
 func addDNSIDLabelsFromExistingEndpoints(existingEndpoints []*endpoint.Endpoint, ep *endpoint.Endpoint) {
+	ensureEndpointLabels(ep)
+
 	_, hasZoneIDLabel := ep.Labels[dnsZoneID]
 	_, hasRecordSetIDLabel := ep.Labels[dnsRecordSetID]
 	_, hasZoneTypeLabel := ep.Labels[dnsZoneType]
