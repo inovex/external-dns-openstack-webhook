@@ -324,9 +324,10 @@ func TestDNSRecords(t *testing.T) {
 	})
 	expected := []*endpoint.Endpoint{
 		{
-			DNSName:    "www.example.com",
-			RecordType: endpoint.RecordTypeA,
-			Targets:    endpoint.Targets{"10.1.1.1"},
+			DNSName:       "www.example.com",
+			RecordType:    endpoint.RecordTypeA,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"10.1.1.1"},
 			Labels: map[string]string{
 				dnsRecordSetID:     rs11ID,
 				dnsZoneID:          zone1ID,
@@ -335,9 +336,10 @@ func TestDNSRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "www.example.com",
-			RecordType: endpoint.RecordTypeTXT,
-			Targets:    endpoint.Targets{"text1"},
+			DNSName:       "www.example.com",
+			RecordType:    endpoint.RecordTypeTXT,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"text1"},
 			Labels: map[string]string{
 				dnsRecordSetID:     rs12ID,
 				dnsZoneID:          zone1ID,
@@ -346,10 +348,11 @@ func TestDNSRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "ftp.example.com",
-			RecordType: endpoint.RecordTypeA,
-			Targets:    endpoint.Targets{"10.1.1.2"},
-			RecordTTL:  120,
+			DNSName:       "ftp.example.com",
+			RecordType:    endpoint.RecordTypeA,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"10.1.1.2"},
+			RecordTTL:     120,
 			Labels: map[string]string{
 				dnsRecordSetID:     rs14ID,
 				dnsZoneID:          zone1ID,
@@ -358,9 +361,10 @@ func TestDNSRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "srv.test.net",
-			RecordType: endpoint.RecordTypeA,
-			Targets:    endpoint.Targets{"10.2.1.1", "10.2.1.2"},
+			DNSName:       "srv.test.net",
+			RecordType:    endpoint.RecordTypeA,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"10.2.1.1", "10.2.1.2"},
 			Labels: map[string]string{
 				dnsRecordSetID:     rs21ID,
 				dnsZoneID:          zone2ID,
@@ -369,9 +373,10 @@ func TestDNSRecords(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "db.test.net",
-			RecordType: endpoint.RecordTypeCNAME,
-			Targets:    endpoint.Targets{"sql.test.net"},
+			DNSName:       "db.test.net",
+			RecordType:    endpoint.RecordTypeCNAME,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"sql.test.net"},
 			Labels: map[string]string{
 				dnsRecordSetID:     rs22ID,
 				dnsZoneID:          zone2ID,
@@ -443,9 +448,10 @@ func TestDNSRecordsPrivateZones(t *testing.T) {
 
 	expected := []*endpoint.Endpoint{
 		{
-			DNSName:    "api.example.internal",
-			RecordType: endpoint.RecordTypeA,
-			Targets:    endpoint.Targets{"10.10.0.5"},
+			DNSName:       "api.example.internal",
+			RecordType:    endpoint.RecordTypeA,
+			SetIdentifier: ZoneTypePrivate,
+			Targets:       endpoint.Targets{"10.10.0.5"},
 			Labels: map[string]string{
 				dnsRecordSetID:     privateRecordID,
 				dnsZoneID:          privateZoneID,
@@ -460,9 +466,10 @@ func TestDNSRecordsPrivateZones(t *testing.T) {
 			},
 		},
 		{
-			DNSName:    "api.example.internal",
-			RecordType: endpoint.RecordTypeA,
-			Targets:    endpoint.Targets{"198.51.100.5"},
+			DNSName:       "api.example.internal",
+			RecordType:    endpoint.RecordTypeA,
+			SetIdentifier: ZoneTypePublic,
+			Targets:       endpoint.Targets{"198.51.100.5"},
 			Labels: map[string]string{
 				dnsRecordSetID:     publicRecordID,
 				dnsZoneID:          publicZoneID,
@@ -633,6 +640,10 @@ func TestAdjustEndpointsNormalizesZoneType(t *testing.T) {
 
 	if _, ok := got[2].GetProviderSpecificProperty(zoneTypeProviderSpecificKey); ok {
 		t.Fatalf("default public endpoint should not gain provider-specific zone type: %+v", got[2].ProviderSpecific)
+	}
+
+	if got[0].SetIdentifier != ZoneTypePublic || got[1].SetIdentifier != ZoneTypePrivate || got[2].SetIdentifier != ZoneTypePublic {
+		t.Fatalf("unexpected set identifiers: got=%q,%q,%q", got[0].SetIdentifier, got[1].SetIdentifier, got[2].SetIdentifier)
 	}
 }
 

@@ -164,19 +164,16 @@ func getEndpointZoneType(ep *endpoint.Endpoint) (string, error) {
 
 func (p dnsProvider) AdjustEndpoints(endpoints []*endpoint.Endpoint) ([]*endpoint.Endpoint, error) {
 	for _, ep := range endpoints {
-		zoneTypeValue, ok := ep.GetProviderSpecificProperty(zoneTypeProviderSpecificKey)
-		if !ok {
-			continue
+		zoneType, err := getEndpointZoneType(ep)
+		if err != nil {
+			return nil, err
 		}
-
-		zoneType := strings.ToLower(strings.TrimSpace(zoneTypeValue))
+		ep.SetIdentifier = zoneType
 		switch zoneType {
 		case ZoneTypePublic:
 			ep.DeleteProviderSpecificProperty(zoneTypeProviderSpecificKey)
 		case ZoneTypePrivate:
 			ep.SetProviderSpecificProperty(zoneTypeProviderSpecificKey, ZoneTypePrivate)
-		default:
-			return nil, fmt.Errorf("invalid %s: %q (allowed: %s, %s)", zoneTypeProviderSpecificKey, zoneTypeValue, ZoneTypePublic, ZoneTypePrivate)
 		}
 	}
 	return endpoints, nil
@@ -229,6 +226,7 @@ func (p dnsProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, error) 
 					ep.Labels[dnsZoneID] = recordSet.ZoneID
 					ep.Labels[dnsZoneType] = zone.zoneType
 					ep.Labels[dnsOriginalRecords] = strings.Join(recordSet.Records, "\000")
+					ep.SetIdentifier = zone.zoneType
 					if zone.zoneType == ZoneTypePrivate {
 						ep.ProviderSpecific = endpoint.ProviderSpecific{
 							{

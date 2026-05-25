@@ -1,0 +1,266 @@
+# End-to-end Kubernetes test manifest for external-dns-t-cloud-public-webhook.
+#
+# Before applying, create these DNS zones in T-Cloud Public:
+#   1. public-zone.webhook.com.           type: public
+#   2. private-zone.webhook.internal.     type: private
+#   3. shared-zone.webhook.test.          type: public
+#   4. shared-zone.webhook.test.          type: private
+#
+# Before applying, review/replace:
+#   public-zone.webhook.com
+#   private-zone.webhook.internal
+#   shared-zone.webhook.test
+#   t-cloud-public
+#   <replace-with-your-clouds-yaml>
+#   ghcr.io/opentelekomcloud/external-dns-t-cloud-public-webhook:1.1.1
+#
+# The Kubernetes annotation external-dns.alpha.kubernetes.io/webhook-zone-type
+# is converted by ExternalDNS into provider-specific property webhook/zone-type,
+# which this webhook uses to choose public or private Designate zones.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns-webhook-test
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: t-cloud-public-clouds-yaml
+  namespace: external-dns-webhook-test
+type: Opaque
+stringData:
+  clouds.yaml: |
+    clouds:
+      t-cloud-public:
+        auth:
+          auth_url: https://iam.eu-de.otc.t-systems.com/v3
+          user_domain_name: "OTC000000000010000XXXXX"
+          project_name: "eu-de"
+          password: secret
+          username: name
+        identity_api_version: 3
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: external-dns-webhook-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns-webhook-test
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods", "nodes"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-webhook-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns-webhook-test
+subjects:
+  - kind: ServiceAccount
+    name: external-dns
+    namespace: external-dns-webhook-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: external-dns-webhook-test
+  labels:
+    app.kubernetes.io/name: external-dns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-dns
+    spec:
+      serviceAccountName: external-dns
+      containers:
+        - name: external-dns
+          image: registry.k8s.io/external-dns/external-dns:v0.21.0
+          args:
+            - --source=service
+            - --provider=webhook
+            - --webhook-provider-url=http://localhost:8888
+            - --domain-filter=public-zone.webhook.com
+            - --domain-filter=private-zone.webhook.internal
+            - --domain-filter=shared-zone.webhook.test
+            - --registry=txt
+            - --txt-owner-id=external-dns-webhook-test
+            - --txt-prefix=external-dns-
+            - --policy=sync
+            - --interval=1m
+            - --log-level=debug
+            - --webhook-provider-read-timeout=30s
+            - --webhook-provider-write-timeout=30s
+        - name: webhook
+          image: ghcr.io/opentelekomcloud/external-dns-t-cloud-public-webhook:1.1.1
+          args:
+            - --domain-filter=public-zone.webhook.com
+            - --domain-filter=private-zone.webhook.internal
+            - --domain-filter=shared-zone.webhook.test
+          env:
+            - name: OS_CLIENT_CONFIG_FILE
+              value: /etc/t-cloud-public/clouds.yaml
+            - name: OS_CLOUD
+              value: t-cloud-public
+          ports:
+            - name: webhook
+              containerPort: 8888
+            - name: status
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: status
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: clouds-yaml
+              mountPath: /etc/t-cloud-public
+              readOnly: true
+      volumes:
+        - name: clouds-yaml
+          secret:
+            secretName: t-cloud-public-clouds-yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-a-default
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: public-a.public-zone.webhook.com
+    external-dns.alpha.kubernetes.io/target: 192.0.2.10
+    external-dns.alpha.kubernetes.io/ttl: "300"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-a-explicit
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: public-a-explicit.public-zone.webhook.com
+    external-dns.alpha.kubernetes.io/target: 192.0.2.11
+    external-dns.alpha.kubernetes.io/webhook-zone-type: public
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-a-multiple-targets
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: public-a-multi.public-zone.webhook.com
+    external-dns.alpha.kubernetes.io/target: 192.0.2.12,192.0.2.13
+    external-dns.alpha.kubernetes.io/ttl: "120"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: private-a
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: private-a.private-zone.webhook.internal
+    external-dns.alpha.kubernetes.io/target: 10.0.0.10
+    external-dns.alpha.kubernetes.io/webhook-zone-type: private
+    external-dns.alpha.kubernetes.io/ttl: "300"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-cname-default
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: public-cname.public-zone.webhook.com
+spec:
+  type: ExternalName
+  externalName: public-a.public-zone.webhook.com
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: private-cname
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: private-cname.private-zone.webhook.internal
+    external-dns.alpha.kubernetes.io/webhook-zone-type: private
+spec:
+  type: ExternalName
+  externalName: private-a.private-zone.webhook.internal
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: same-name-public
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: split-horizon.shared-zone.webhook.test
+    external-dns.alpha.kubernetes.io/target: 192.0.2.20
+    external-dns.alpha.kubernetes.io/set-identifier: public
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: same-name-private
+  namespace: external-dns-webhook-test
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: split-horizon.shared-zone.webhook.test
+    external-dns.alpha.kubernetes.io/target: 10.0.0.20
+    external-dns.alpha.kubernetes.io/set-identifier: private
+    external-dns.alpha.kubernetes.io/webhook-zone-type: private
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

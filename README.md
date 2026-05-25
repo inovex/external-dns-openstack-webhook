@@ -19,7 +19,7 @@ provider:
   webhook:
     image:
       repository: ghcr.io/opentelekomcloud/external-dns-t-cloud-public-webhook
-      tag: 1.1.0
+      tag: 1.1.1
     extraVolumeMounts:
       - name: tcloudpubliccloudsyaml
         mountPath: /etc/t-cloud-public/
@@ -37,7 +37,11 @@ The one exception to this is `OS_CLOUD` for setting the name of the cloud in `cl
 
 Note: custom TLS settings from `clouds.yaml`, such as `cacert`, `cert`, `key`, or disabled certificate verification, are not explicitly supported by the current webhook auth bootstrap yet. Environments that rely on private trust roots or client-certificate TLS may require a future dedicated implementation.
 
-By default, endpoints are created in public DNS zones. To target a private zone for a specific Kubernetes object, set the provider-specific annotation:
+## Zone selection
+
+The webhook can manage public and private Designate zones from one ExternalDNS instance.
+
+By default, endpoints are created in public DNS zones. To target a private zone for a specific Kubernetes object, set the webhook provider-specific annotation:
 
 ```yaml
 metadata:
@@ -46,6 +50,38 @@ metadata:
 ```
 
 Supported values are `public` and `private`. If the annotation is omitted, `public` is used.
+
+When managing the same DNS name in both public and private zones, add distinct ExternalDNS set identifiers so the Service source does not merge the endpoints before they reach the webhook:
+
+```yaml
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: split-horizon.example.com
+    external-dns.alpha.kubernetes.io/target: 192.0.2.20
+    external-dns.alpha.kubernetes.io/set-identifier: public
+---
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: split-horizon.example.com
+    external-dns.alpha.kubernetes.io/target: 10.0.0.20
+    external-dns.alpha.kubernetes.io/set-identifier: private
+    external-dns.alpha.kubernetes.io/webhook-zone-type: private
+```
+
+## Examples
+
+An end-to-end Kubernetes example with ExternalDNS, the webhook sidecar, credentials Secret, RBAC, public/private Services, CNAMEs, and split-horizon records is available at [`examples`](examples/k8s-webhook-test-services.yaml).
+
+The example requires these zones to exist in T-Cloud Public before applying the manifest:
+
+- `public-zone.webhook.com.` as `public`
+- `private-zone.webhook.internal.` as `private`
+- `shared-zone.webhook.test.` as `public`
+- `shared-zone.webhook.test.` as `private`
+
+The manifest is intended as a test fixture. Review image tags, credentials, domain names, and ownership settings before using it in a real cluster.
+
+## Credentials
 
 The following example is a basic example of a `clouds.yaml` file, using `t-cloud-public` as the cloud name (the default used by this webhook):
 
