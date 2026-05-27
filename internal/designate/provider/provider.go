@@ -116,7 +116,7 @@ func getHostZoneID(hostname string, managedZones map[string]string) string {
 	resultID := ""
 
 	for zoneID, zoneName := range managedZones {
-		if !strings.HasSuffix(hostname, "." + zoneName) && hostname != zoneName {
+		if !strings.HasSuffix(hostname, "."+zoneName) && hostname != zoneName {
 			continue
 		}
 		ln := len(zoneName)
