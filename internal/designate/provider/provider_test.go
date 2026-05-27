@@ -63,7 +63,7 @@ func (c fakeDesignateClient) AddZone(ctx context.Context, zone zones.Zone) strin
 	return zone.ID
 }
 
-func (c fakeDesignateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
+func (c fakeDesignateClient) ForEachZone(ctx context.Context, filters []string, handler func(zone *zones.Zone) error) error {
 	for _, zone := range c.managedZones {
 		if err := handler(zone.zone); err != nil {
 			return err
@@ -494,7 +494,7 @@ func testDesignateCreateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, nil, func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			id := recordSet.ID
 			recordSet.ID = ""
@@ -586,7 +586,7 @@ func testDesignateUpdateRecords(t *testing.T, client *fakeDesignateClient) []*re
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, nil, func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)
@@ -646,7 +646,7 @@ func testDesignateDeleteRecords(t *testing.T, client *fakeDesignateClient) {
 		t.Fatal(err)
 	}
 
-	client.ForEachZone(ctx, func(zone *zones.Zone) error {
+	client.ForEachZone(ctx, nil, func(zone *zones.Zone) error {
 		client.ForEachRecordSet(ctx, zone.ID, func(recordSet *recordsets.RecordSet) error {
 			for i, ex := range expected {
 				sort.Strings(recordSet.Records)

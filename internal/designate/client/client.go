@@ -38,8 +38,8 @@ import (
 
 // interface between provider and OpenStack DNS API
 type DesignateClientInterface interface {
-	// ForEachZone calls handler for each zone managed by the Designate
-	ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error
+	// ForEachZone calls handler for each zone managed by the Designate, optionally filtered by name
+	ForEachZone(ctx context.Context, filters []string, handler func(zone *zones.Zone) error) error
 
 	// ForEachRecordSet calls handler for each recordset in the given DNS zone
 	ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error
@@ -102,36 +102,48 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	return client, nil
 }
 
-// ForEachZone calls handler for each zone managed by the Designate
-func (c designateClient) ForEachZone(ctx context.Context, handler func(zone *zones.Zone) error) error {
+// ForEachZone calls handler for each zone managed by the Designate, optionally filtered by name.
+// If filters is non-empty, one API call per filter value is made using the ?name= query param
+// (server-side filtering).
+func (c designateClient) ForEachZone(ctx context.Context, filters []string, handler func(zone *zones.Zone) error) error {
 	startTime := time.Now()
-
-	pager := zones.List(c.serviceClient, zones.ListOpts{})
 	var pageCount int
 	var zoneCount int
 
-	err := pager.EachPage(ctx,
-		func(ctx context.Context, page pagination.Page) (bool, error) {
-			// Each page corresponds to a separate API call.
-			pageCount++
-			metrics.TotalApiCalls.Inc()
+	doList := func(opts zones.ListOpts) error {
+		pager := zones.List(c.serviceClient, opts)
+		return pager.EachPage(ctx,
+			func(ctx context.Context, page pagination.Page) (bool, error) {
+				pageCount++
+				metrics.TotalApiCalls.Inc()
 
-			list, err := zones.ExtractZones(page)
-			if err != nil {
-				return false, err
-			}
-
-			zoneCount += len(list)
-
-			for _, zone := range list {
-				err := handler(&zone)
+				list, err := zones.ExtractZones(page)
 				if err != nil {
 					return false, err
 				}
+
+				zoneCount += len(list)
+
+			for _, zone := range list {
+				if err := handler(&zone); err != nil {
+					return false, err
+				}
 			}
-			return true, nil
-		},
-	)
+				return true, nil
+			},
+		)
+	}
+
+	var err error
+	if len(filters) == 0 {
+		err = doList(zones.ListOpts{})
+	} else {
+		for _, f := range filters {
+			if err = doList(zones.ListOpts{Name: f + "."}); err != nil {
+				break
+			}
+		}
+	}
 
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("ForEachZone").Observe(duration.Seconds())
