@@ -19,10 +19,10 @@ provider:
   webhook:
     image:
       repository: ghcr.io/opentelekomcloud/external-dns-t-cloud-public-webhook
-      tag: 1.1.1
+      tag: 1.1.2
     extraVolumeMounts:
       - name: tcloudpubliccloudsyaml
-        mountPath: /etc/t-cloud-public/
+        mountPath: /etc/openstack/
     resources: {}
 extraVolumes:
   - name: tcloudpubliccloudsyaml
@@ -83,11 +83,11 @@ The manifest is intended as a test fixture. Review image tags, credentials, doma
 
 ## Credentials
 
-The following example is a basic example of a `clouds.yaml` file, using `t-cloud-public` as the cloud name (the default used by this webhook):
+The following example is a basic example of a `clouds.yaml` file, using `openstack` as the cloud name (the default used by this webhook):
 
 ```yaml
 clouds:
-  t-cloud-public:
+  openstack:
     auth:
       auth_url: https://iam.eu-de.otc.t-systems.com/v3
       user_domain_name: "OTC000000000010000XXXXX"
