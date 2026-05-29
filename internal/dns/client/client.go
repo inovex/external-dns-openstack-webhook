@@ -20,6 +20,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"external-dns-t-cloud-public-webhook/internal/metrics"
@@ -72,7 +73,12 @@ func createDNSServiceClient() (*golangsdk.ServiceClient, error) {
 		return nil, err
 	}
 
-	providerClient, err := openstack.AuthenticatedClientFromCloud(cloud)
+	authOptions, err := authOptionsFromCloud(cloud)
+	if err != nil {
+		return nil, err
+	}
+
+	providerClient, err := openstack.AuthenticatedClient(authOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +97,20 @@ func createDNSServiceClient() (*golangsdk.ServiceClient, error) {
 	}
 	log.Infof("Found T-Cloud Public DNS service at %s", client.Endpoint)
 	return client, nil
+}
+
+func authOptionsFromCloud(cloud *openstack.Cloud) (golangsdk.AuthOptionsProvider, error) {
+	authOptions, err := openstack.AuthOptionsFromInfo(&cloud.AuthInfo, cloud.AuthType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert AuthInfo to AuthOptsBuilder with Env vars: %s", err)
+	}
+
+	if opts, ok := authOptions.(golangsdk.AuthOptions); ok {
+		opts.AllowReauth = true
+		authOptions = opts
+	}
+
+	return authOptions, nil
 }
 
 // ForEachZone calls handler for each managed zone
