@@ -1,3 +1,6 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
 project_name: external-dns-openstack-webhook
 before:
   hooks:
@@ -32,35 +35,19 @@ builds:
       - goos: darwin
         goarch: arm
 
-dockers:
+dockers_v2:
   - ids:
       - external-dns-openstack-webhook
-    image_templates:
-      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64
-    goos: linux
-    goarch: amd64
     dockerfile: goreleaser.dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/amd64"
-    use: buildx
-  - ids:
-      - external-dns-openstack-webhook
-    image_templates:
-      - ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64
-    goos: linux
-    goarch: arm64
-    dockerfile: goreleaser.dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/arm64"
-    use: buildx
-
-docker_manifests:
-  - name_template: "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/inovex/{{ .ProjectName }}:{{ .Version }}-arm64"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    images:
+      - ghcr.io/inovex/{{ .ProjectName }}
+    build_args:
+      BINARY_NAME: "{{ .ProjectName }}"
+    tags:
+      - "v{{ .Version }}"
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
