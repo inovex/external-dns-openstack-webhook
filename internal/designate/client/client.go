@@ -19,6 +19,8 @@ package client
 
 import (
 	"context"
+	"net/http"
+	"os"
 	"time"
 
 	"external-dns-openstack-webhook/internal/metrics"
@@ -30,6 +32,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/recordsets"
 	"github.com/gophercloud/gophercloud/v2/openstack/dns/v2/zones"
 	"github.com/gophercloud/gophercloud/v2/pagination"
+	"github.com/gophercloud/utils/v2/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -78,6 +81,16 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithTLSConfig(tlsConfig))
 	if err != nil {
 		return nil, err
+	}
+
+	// log all OpenStack API requests if debugging is enabled
+	if os.Getenv("OS_DEBUG") != "" {
+		providerClient.HTTPClient = http.Client{
+			Transport: &client.RoundTripper{
+				Rt:     &http.Transport{},
+				Logger: &client.DefaultLogger{},
+			},
+		}
 	}
 	log.Infof("Using OpenStack Keystone at %s", providerClient.IdentityEndpoint)
 

@@ -6,7 +6,7 @@ The webhook, while already a drop in replacement, is not perfect (yet)! If you h
 
 ## Installation
 
-This webhook provider is run easiest as sidecar within the `external-dns` pod. This can be achieved using the 
+This webhook provider is run easiest as sidecar within the `external-dns` pod. This can be achieved using the
 [official `external-dns` Helm chart](https://kubernetes-sigs.github.io/external-dns/latest/charts/external-dns/)
 and [its support for the `webhook` provider type]([https://kubernetes-sigs.github.io/external-dns/latest/charts/external-dns/#providers]).
 
@@ -55,6 +55,11 @@ An existing file can be converted into a Secret via kubectl:
 kubectl create secret generic oscloudsyaml --namespace external-dns --from-file=clouds.yaml
 ```
 
+## Debugging
+
+The webhook provider itself logs most / all of its actions. If debugging the communication with then OpenStack (Designate) API is required one can set the environment variable.
+`OS_DEBUG=1` to have all of the API requests logged. As this might leak sensitive data, use for bug hunting only.
+
 ## Bugs or feature requests
 
 This webhook certainly still contains bugs or lacks certain features.
@@ -62,7 +67,7 @@ In such cases, please raise a GitHub issue with as much detail as possible. PRs 
 
 ## Development
 
-To run the webhook locally, you'll also require a [clouds.yaml](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html#clouds-yaml) file in one of the standard-locations.
+To run the webhook locally, you'll also require a [clouds.yaml](https://docs.openstack.org/openstacksdk/latest/user/config/configuration.html) file in one of the standard-locations.
 Also the name of the entry to be used has be given via `OS_CLOUD` environment variable.
 You can then start the webhook server using:
 
