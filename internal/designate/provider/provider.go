@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
 	"sigs.k8s.io/external-dns/provider"
+
+	"external-dns-openstack-webhook/internal/designate/client"
 )
 
 const (
@@ -104,7 +106,7 @@ func canonicalizeDomainName(d string) string {
 func (p designateProvider) getZones(ctx context.Context) (map[string]string, error) {
 	result := map[string]string{}
 
-	err := p.client.ForEachZone(ctx,
+	err := p.client.ForEachZone(ctx, p.domainFilter.Filters,
 		func(zone *zones.Zone) error {
 			if zone.Type != "" && strings.ToUpper(zone.Type) != "PRIMARY" || zone.Status == "DELETE" {
 				return nil
