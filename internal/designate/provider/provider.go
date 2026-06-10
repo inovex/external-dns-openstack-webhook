@@ -19,6 +19,7 @@ package provider
 
 import (
 	"context"
+	"external-dns-openstack-webhook/internal/designate/client"
 	"fmt"
 	"strings"
 
@@ -72,10 +73,23 @@ func NewDesignateProvider(domainFilter endpoint.DomainFilter, dryRun bool) (prov
 func canonicalizeDomainNames(domains []string) []string {
 	var cDomains []string
 	for _, d := range domains {
-		if !strings.HasSuffix(d, ".") {
-			d += "."
-			cDomains = append(cDomains, strings.ToLower(d))
+		cDomains = append(cDomains, canonicalizeDomainName(d))
+	}
+	return cDomains
+}
+
+func canonicalizeDomainNamesForMX(domains []string) []string {
+	var cDomains []string
+
+	for _, d := range domains {
+		parts := strings.Split(d, " ")
+		if len(parts) == 2 {
+			// If the format does not conform to the expected one, play it safe and just pass the value on.
+			// Otherwise, canonicalize the hostname.
+			d = fmt.Sprintf("%s %s", parts[0], canonicalizeDomainName(parts[1]))
 		}
+
+		cDomains = append(cDomains, canonicalizeDomainName(d))
 	}
 	return cDomains
 }
@@ -139,7 +153,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	for zoneID := range managedZones {
 		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
+				if !p.supportedRecordType(recordSet.Type) {
 					return nil
 				}
 
@@ -158,6 +172,15 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	}
 
 	return result, nil
+}
+
+func (p designateProvider) supportedRecordType(recordType string) bool {
+	switch recordType {
+	case endpoint.RecordTypeA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME, endpoint.RecordTypeNS, endpoint.RecordTypeMX:
+		return true
+	default:
+		return false
+	}
 }
 
 // temporary structure to hold recordset parameters so that we could aggregate endpoints into recordsets
@@ -197,8 +220,11 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 		}
 	}
 	targets := ep.Targets
-	if ep.RecordType == endpoint.RecordTypeCNAME {
+	if ep.RecordType == endpoint.RecordTypeCNAME || ep.RecordType == endpoint.RecordTypeNS {
 		targets = canonicalizeDomainNames(targets)
+	}
+	if ep.RecordType == endpoint.RecordTypeMX {
+		targets = canonicalizeDomainNamesForMX(targets)
 	}
 	for _, t := range targets {
 		rs.names[t] = !delete
