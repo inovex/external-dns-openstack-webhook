@@ -22,7 +22,9 @@ const (
 
 func main() {
 	var domainFilters []string
+	var allProjects bool
 	pflag.StringArrayVar(&domainFilters, "domain-filter", []string{}, "List of domains to work on (can be specified multiple times)")
+	pflag.BoolVar(&allProjects, "all-projects", false, "Manage all zones and recordsets regardless of the project the service user resides in")
 	pflag.Parse()
 
 	log.SetLevel(log.DebugLevel)
@@ -61,7 +63,7 @@ func main() {
 	}()
 
 	epf := endpoint.NewDomainFilter(domainFilters)
-	dp, err := provider.NewDesignateProvider(*epf, false)
+	dp, err := provider.NewDesignateProvider(*epf, allProjects, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
 		metrics.OpenstackConnectionMetric.Set(0)

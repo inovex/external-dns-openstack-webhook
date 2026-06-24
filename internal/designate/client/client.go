@@ -54,16 +54,23 @@ type DesignateClientInterface interface {
 	DeleteRecordSet(ctx context.Context, zoneID, recordSetID string) error
 }
 
+const allProjectsHeader = "X-Auth-All-Projects"
+
 // implementation of the DesignateClientInterface
 type designateClient struct {
 	serviceClient *gophercloud.ServiceClient
 }
 
 // factory function for the DesignateClientInterface
-func NewDesignateClient() (DesignateClientInterface, error) {
+func NewDesignateClient(allProjects bool) (DesignateClientInterface, error) {
 	serviceClient, err := createDesignateServiceClient()
 	if err != nil {
 		return nil, err
+	}
+	if allProjects {
+		serviceClient.MoreHeaders = map[string]string{
+			allProjectsHeader: "true",
+		}
 	}
 	return &designateClient{serviceClient}, nil
 }
