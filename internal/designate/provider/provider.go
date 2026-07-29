@@ -139,7 +139,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	for zoneID := range managedZones {
 		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
+				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeAAAA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
 					return nil
 				}
 
