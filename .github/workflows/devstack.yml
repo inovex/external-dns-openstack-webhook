@@ -126,4 +126,4 @@ jobs:
         run: |
           curl -sf -H "Accept: application/external.dns.webhook+json;version=1" http://127.0.0.1:8888/records -o /tmp/records.json
           cat /tmp/records.json
-          jq -e '[.[] | select(.recordType == "AAAA" and .dnsName == "aaaa-webhook-test.example.com." and (.targets[0] == "2001:db8::1"))] | length == 1' /tmp/records.json
+          jq -e '[.[] | select(.recordType == "AAAA" and .dnsName == "aaaa-webhook-test.example.com" and (.targets[0] == "2001:db8::1"))] | length == 1' /tmp/records.json
