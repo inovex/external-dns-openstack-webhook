@@ -120,7 +120,7 @@ jobs:
 
       - name: Wait for AAAA recordset to become ACTIVE
         run: |
-          while [ "$(openstack recordset list example.com. -f csv | grep PENDING)" != "" ]; do date; openstack recordset list example.com. -f value; sleep 1; done
+          while [ "$(openstack recordset list example.com. --status PENDING -f value)" != "" ]; do date; openstack recordset list example.com. -f value; sleep 1; done
 
       - name: Verify the webhook reports the AAAA recordset via GET /records
         run: |
