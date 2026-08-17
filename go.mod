@@ -3,7 +3,7 @@ module external-dns-openstack-webhook
 go 1.26.3
 
 require (
-	github.com/sirupsen/logrus v1.9.4
+	github.com/sirupsen/logrus v1.10.0
 	sigs.k8s.io/external-dns v0.21.0
 )
 
