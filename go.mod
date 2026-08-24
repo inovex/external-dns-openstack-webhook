@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/gophercloud/gophercloud/v2 v2.13.0
+	github.com/gophercloud/gophercloud/v2 v2.14.0
 	github.com/gophercloud/utils/v2 v2.0.0-20260424064311-2eeed4ceb3e9
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spf13/pflag v1.0.10
