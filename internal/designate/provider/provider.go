@@ -129,6 +129,16 @@ func getHostZoneID(hostname string, managedZones map[string]string) string {
 	return resultID
 }
 
+// isTypeSupported returns whether recordType is a type this provider reads back from Designate.
+func isTypeSupported(recordType string) bool {
+	switch recordType {
+	case endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME:
+		return true
+	default:
+		return false
+	}
+}
+
 // Records returns the list of records.
 func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, error) {
 	var result []*endpoint.Endpoint
@@ -139,7 +149,7 @@ func (p designateProvider) Records(ctx context.Context) ([]*endpoint.Endpoint, e
 	for zoneID := range managedZones {
 		err = p.client.ForEachRecordSet(ctx, zoneID,
 			func(recordSet *recordsets.RecordSet) error {
-				if recordSet.Type != endpoint.RecordTypeA && recordSet.Type != endpoint.RecordTypeTXT && recordSet.Type != endpoint.RecordTypeCNAME {
+				if !isTypeSupported(recordSet.Type) {
 					return nil
 				}
 

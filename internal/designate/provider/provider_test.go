@@ -297,6 +297,11 @@ func TestDesignateRecords(t *testing.T) {
 		TTL:     120,
 		Records: []string{"10.1.1.2"},
 	})
+	rs15ID, _ := client.CreateRecordSet(ctx, zone1ID, recordsets.CreateOpts{
+		Name:    "www6.example.com.",
+		Type:    endpoint.RecordTypeAAAA,
+		Records: []string{"2001:db8::1"},
+	})
 
 	zone2ID := client.AddZone(ctx, zones.Zone{
 		Name:   "test.net.",
@@ -343,6 +348,16 @@ func TestDesignateRecords(t *testing.T) {
 				designateRecordSetID:     rs14ID,
 				designateZoneID:          zone1ID,
 				designateOriginalRecords: "10.1.1.2",
+			},
+		},
+		{
+			DNSName:    "www6.example.com",
+			RecordType: endpoint.RecordTypeAAAA,
+			Targets:    endpoint.Targets{"2001:db8::1"},
+			Labels: map[string]string{
+				designateRecordSetID:     rs15ID,
+				designateZoneID:          zone1ID,
+				designateOriginalRecords: "2001:db8::1",
 			},
 		},
 		{

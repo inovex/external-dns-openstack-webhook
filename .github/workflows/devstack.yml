@@ -107,3 +107,23 @@ jobs:
         run: |
           if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
           if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
+
+      # external-dns's `fake` source only ever produces A records, so the checks above never
+      # exercise AAAA handling. Regression test for a bug where the webhook's Records() call
+      # silently dropped AAAA recordsets, so external-dns would never see an AAAA record as
+      # already existing and would loop forever trying (and failing) to recreate it. Designate
+      # itself already had the record correctly, so `openstack recordset list` alone can't catch
+      # this - the bug is specifically in what the webhook reports back over its own API.
+      - name: Seed an AAAA recordset directly in Designate
+        run: |
+          openstack recordset create example.com. aaaa-webhook-test.example.com. --type AAAA --record 2001:db8::1
+
+      - name: Wait for AAAA recordset to become ACTIVE
+        run: |
+          while [ "$(openstack recordset list example.com. --status PENDING -f value)" != "" ]; do date; openstack recordset list example.com. -f value; sleep 1; done
+
+      - name: Verify the webhook reports the AAAA recordset via GET /records
+        run: |
+          curl -sf -H "Accept: application/external.dns.webhook+json;version=1" http://127.0.0.1:8888/records -o /tmp/records.json
+          cat /tmp/records.json
+          jq -e '[.[] | select(.recordType == "AAAA" and .dnsName == "aaaa-webhook-test.example.com" and (.targets[0] == "2001:db8::1"))] | length == 1' /tmp/records.json
