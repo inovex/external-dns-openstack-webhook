@@ -56,8 +56,8 @@ type designateProvider struct {
 }
 
 // NewDesignateProvider is a factory function for OpenStack designate providers
-func NewDesignateProvider(domainFilter endpoint.DomainFilter, dryRun bool) (provider.Provider, error) {
-	client, err := client.NewDesignateClient()
+func NewDesignateProvider(domainFilter endpoint.DomainFilter, allProjects, dryRun bool) (provider.Provider, error) {
+	client, err := client.NewDesignateClient(allProjects)
 	if err != nil {
 		return nil, err
 	}
