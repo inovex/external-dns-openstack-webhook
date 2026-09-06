@@ -57,15 +57,16 @@ type DesignateClientInterface interface {
 // implementation of the DesignateClientInterface
 type designateClient struct {
 	serviceClient *gophercloud.ServiceClient
+	allProjects   bool
 }
 
 // factory function for the DesignateClientInterface
-func NewDesignateClient() (DesignateClientInterface, error) {
+func NewDesignateClient(allProjects bool) (DesignateClientInterface, error) {
 	serviceClient, err := createDesignateServiceClient()
 	if err != nil {
 		return nil, err
 	}
-	return &designateClient{serviceClient}, nil
+	return &designateClient{serviceClient: serviceClient, allProjects: allProjects}, nil
 }
 
 // authenticate in OpenStack and obtain Designate service endpoint
@@ -136,10 +137,10 @@ func (c designateClient) ForEachZone(ctx context.Context, filters []string, hand
 
 	var err error
 	if len(filters) == 0 {
-		err = doList(zones.ListOpts{})
+		err = doList(zones.ListOpts{AllProjects: c.allProjects})
 	} else {
 		for _, f := range filters {
-			if err = doList(zones.ListOpts{Name: f + "."}); err != nil {
+			if err = doList(zones.ListOpts{Name: f + ".", AllProjects: c.allProjects}); err != nil {
 				break
 			}
 		}
@@ -162,7 +163,7 @@ func (c designateClient) ForEachZone(ctx context.Context, filters []string, hand
 func (c designateClient) ForEachRecordSet(ctx context.Context, zoneID string, handler func(recordSet *recordsets.RecordSet) error) error {
 	startTime := time.Now()
 
-	pager := recordsets.ListByZone(c.serviceClient, zoneID, recordsets.ListOpts{})
+	pager := recordsets.ListByZone(c.serviceClient, zoneID, recordsets.ListOpts{AllProjects: c.allProjects})
 	var pageCount int
 	var recordCount int
 
@@ -209,6 +210,7 @@ func (c designateClient) CreateRecordSet(ctx context.Context, zoneID string, opt
 
 	log.Debugf("→ Creating recordset: %s (%s) with %d targets", opts.Name, opts.Type, len(opts.Records))
 
+	opts.AllProjects = c.allProjects
 	r, err := recordsets.Create(ctx, c.serviceClient, zoneID, opts).Extract()
 
 	duration := time.Since(startTime)
@@ -235,6 +237,7 @@ func (c designateClient) UpdateRecordSet(ctx context.Context, zoneID, recordSetI
 	}
 	log.Debugf("→ Updating recordset: %s with %d targets", recordSetID, recordCount)
 
+	opts.AllProjects = c.allProjects
 	_, err := recordsets.Update(ctx, c.serviceClient, zoneID, recordSetID, opts).Extract()
 
 	duration := time.Since(startTime)
@@ -257,7 +260,7 @@ func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetI
 
 	log.Debugf("→ Deleting recordset: %s", recordSetID)
 
-	err := recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID).ExtractErr()
+	err := recordsets.DeleteWithOpts(ctx, c.serviceClient, zoneID, recordSetID, recordsets.DeleteOpts{AllProjects: c.allProjects}).ExtractErr()
 
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("DeleteRecordSet").Observe(duration.Seconds())

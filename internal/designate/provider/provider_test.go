@@ -262,7 +262,7 @@ clouds:
 	os.Setenv("OS_CLOUD", "unittest")
 	os.Setenv("OS_CACERT", tmpfile.Name())
 
-	if _, err := NewDesignateProvider(endpoint.DomainFilter{}, true); err != nil {
+	if _, err := NewDesignateProvider(endpoint.DomainFilter{}, false, true); err != nil {
 		t.Fatalf("Failed to initialize Designate provider: %s", err)
 	}
 }
