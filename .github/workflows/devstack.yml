@@ -70,6 +70,16 @@ jobs:
         run: ./stack.sh
         working-directory: ./devstack
 
+      - name: Fix Designate root_helper
+        # root_helper defaults to "sudo designate-rootwrap ..." in designate/conf/base.py.
+        # designate-rootwrap lives in the devstack venv (/opt/stack/data/venv/bin) which
+        # is not in sudo's secure_path -> every rndc addzone fails -> zones PENDING->ERROR.
+        # Insert the absolute path immediately after [DEFAULT] so oslo.config picks it up.
+        run: |
+          sudo sed -i '/^\[DEFAULT\]/a root_helper = sudo /opt/stack/data/venv/bin/designate-rootwrap /etc/designate/rootwrap.conf' \
+            /etc/designate/designate.conf
+        shell: bash
+
       - name: Restart Designate
         run: sudo systemctl restart "devstack@designate-*.service"
 
