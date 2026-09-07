@@ -50,6 +50,8 @@ jobs:
         working-directory: ./external-dns
 
       - name: Configure devstack
+        shell: bash
+        working-directory: ./devstack
         run: |
           cat <<EOF > local.conf
           [[local|localrc]]
@@ -72,14 +74,13 @@ jobs:
           enable_plugin designate https://opendev.org/openstack/designate ${{ env.DEVSTACK_BRANCH }}
           enable_service designate,designate-central,designate-api,designate-zone-manager,designate-mdns,designate-worker,designate-producer
           EOF
-        working-directory: ./devstack
-        shell: bash
 
       - name: Run stack.sh
-        run: ./stack.sh
         working-directory: ./devstack
+        run: ./stack.sh
 
       - name: Fix Designate root_helper
+        shell: bash
         # root_helper defaults to "sudo designate-rootwrap ..." in designate/conf/base.py.
         # designate-rootwrap lives in the devstack venv (/opt/stack/data/venv/bin) which
         # is not in sudo's secure_path -> every rndc addzone fails -> zones PENDING->ERROR.
@@ -87,7 +88,6 @@ jobs:
         run: |
           sudo sed -i '/^\[DEFAULT\]/a root_helper = sudo /opt/stack/data/venv/bin/designate-rootwrap /etc/designate/rootwrap.conf' \
             /etc/designate/designate.conf
-        shell: bash
 
       - name: Restart Designate
         run: sudo systemctl restart "devstack@designate-*.service"
@@ -105,8 +105,8 @@ jobs:
           ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
 
       - name: Run external-dns
-        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --policy sync --log-level=debug --once 2>&1
         working-directory: ./external-dns
+        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --policy sync --log-level=debug --once 2>&1
 
       - name: Show /tmp/external-dns-openstack-webhook.log
         run: cat /tmp/external-dns-openstack-webhook.log
@@ -147,8 +147,8 @@ jobs:
           curl -sf http://127.0.0.1:8888 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
 
       - name: Run external-dns against all-projects.test as admin user
-        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --source fake --policy sync --fqdn-template=all-projects.test --log-level=debug --once 2>&1
         working-directory: ./external-dns
+        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --source fake --policy sync --fqdn-template=all-projects.test --log-level=debug --once 2>&1
 
       - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
         run: cat /tmp/external-dns-openstack-webhook-all-projects.log
