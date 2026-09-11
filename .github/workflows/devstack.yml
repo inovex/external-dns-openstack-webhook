@@ -3,6 +3,8 @@ on:
   pull_request:
 
 env:
+  # renovate: datasource=git-refs depName=https://opendev.org/openstack/devstack.git extractVersion=^refs/heads/(?<version>stable/20\d{2}\.\d+)$ versioning=loose
+  DEVSTACK_BRANCH: stable/2025.2
   # renovate: datasource=github-releases depName=kubernetes-sigs/external-dns
   CI_EXTERNAL_DNS_VERSION: v0.22.0
   OS_CLOUD: devstack-admin-demo
@@ -26,7 +28,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: openstack/devstack
-          ref: "stable/2025.2"
+          ref: ${{ env.DEVSTACK_BRANCH }}
           path: ./devstack
 
       - name: Set up Go
@@ -51,6 +53,11 @@ jobs:
         run: |
           cat <<EOF > local.conf
           [[local|localrc]]
+
+          # this sets the branch to use for all plugins
+          # (defaults to 'master' if not set)
+          TARGET_BRANCH=${{ env.DEVSTACK_BRANCH }}
+
           ADMIN_PASSWORD=secret
           DATABASE_PASSWORD=root
           RABBIT_PASSWORD=secret
@@ -62,7 +69,7 @@ jobs:
           ENABLE_HTTPD_MOD_WSGI_SERVICES=True
           DESIGNATE_BACKEND_DRIVER=bind9
 
-          enable_plugin designate https://opendev.org/openstack/designate stable/2025.2
+          enable_plugin designate https://opendev.org/openstack/designate ${{ env.DEVSTACK_BRANCH }}
           enable_service designate,designate-central,designate-api,designate-zone-manager,designate-mdns,designate-worker,designate-producer
           EOF
         working-directory: ./devstack
