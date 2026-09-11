@@ -3,6 +3,8 @@ on:
   pull_request:
 
 env:
+  # renovate: datasource=github-releases depName=kubernetes-sigs/external-dns
+  CI_EXTERNAL_DNS_VERSION: v0.20.0
   OS_CLOUD: devstack-admin-demo
 
 jobs:
@@ -18,7 +20,7 @@ jobs:
         with:
           repository: kubernetes-sigs/external-dns
           path: ./external-dns
-          ref: v0.20.0
+          ref: ${{ env.CI_EXTERNAL_DNS_VERSION }}
 
       - name: Checkout openstack/devstack
         uses: actions/checkout@v7
