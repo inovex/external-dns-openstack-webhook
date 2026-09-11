@@ -117,8 +117,10 @@ jobs:
 
       - name: Check created entries
         run: |
-          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
-          if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
+          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 3 ]; then exit 1; fi
+          if [ $(openstack recordset list all -f value | grep -c " A ") -ne 1 ]; then exit 2; fi
+          if [ $(openstack recordset list all -f value | grep -c " AAAA ") -ne 1 ]; then exit 3; fi
+          if [ $(openstack recordset list all -f value | grep -c " CNAME ") -ne 1 ]; then exit 4; fi
 
       - name: Create zone all-projects.test in alt_demo project
         run: |
@@ -146,4 +148,4 @@ jobs:
 
       - name: Check all-projects created entries in all-projects.test
         run: |
-          if [ $(openstack --os-cloud devstack-admin recordset list all-projects.test. --all-projects -f value | grep -c "all-projects-cluster-id") -ne 10 ]; then exit 1; fi
+          if [ $(openstack --os-cloud devstack-admin recordset list all-projects.test. --all-projects -f value | grep -c "all-projects-cluster-id") -ne 3 ]; then exit 1; fi
