@@ -98,7 +98,7 @@ jobs:
           ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
 
       - name: Run external-dns
-        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
+        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --policy sync --log-level=debug --once 2>&1
         working-directory: ./external-dns
 
       - name: Show /tmp/external-dns-openstack-webhook.log
@@ -138,7 +138,7 @@ jobs:
           curl -sf http://127.0.0.1:8888 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
 
       - name: Run external-dns against all-projects.test as admin user
-        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --source fake --fqdn-template=all-projects.test --log-level=debug --once 2>&1
+        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --source fake --policy sync --fqdn-template=all-projects.test --log-level=debug --once 2>&1
         working-directory: ./external-dns
 
       - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
