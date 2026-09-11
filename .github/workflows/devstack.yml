@@ -4,7 +4,7 @@ on:
 
 env:
   # renovate: datasource=github-releases depName=kubernetes-sigs/external-dns
-  CI_EXTERNAL_DNS_VERSION: v0.20.0
+  CI_EXTERNAL_DNS_VERSION: v0.22.0
   OS_CLOUD: devstack-admin-demo
 
 jobs:
