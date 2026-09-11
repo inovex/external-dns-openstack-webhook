@@ -77,6 +77,8 @@ github.com/gophercloud/gophercloud/v2 v2.14.0 h1:xGxKCvyaOxJDc5FqrnKDNqtdYn43ocQ
 github.com/gophercloud/gophercloud/v2 v2.14.0/go.mod h1:4fs5I9VH6Wg2LyocDL9xf0ASb8VD63tyLA8sgAX/69U=
 github.com/gophercloud/utils/v2 v2.0.0-20260424064311-2eeed4ceb3e9 h1:WEPhYFzYmpfWHq+YPaP3+8pYf4wKQuJMkgPiiI4g7CY=
 github.com/gophercloud/utils/v2 v2.0.0-20260424064311-2eeed4ceb3e9/go.mod h1:bIEH+wgvnxfegUewFuGi0u/L+ji5uiEuVVQMNKQASEY=
+github.com/gophercloud/utils/v2 v2.0.0-20260824073324-42b9474d09d4 h1:VKbePn/0e1cg6HSvVB5CKeXpVcKmD2AuMk6WQhjexuI=
+github.com/gophercloud/utils/v2 v2.0.0-20260824073324-42b9474d09d4/go.mod h1:z+yO4g4N0u8rJuWNPVcjZHVAlzAFapFNnMOtFIpqddM=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/klauspost/compress v1.19.1 h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJnhSlk=
