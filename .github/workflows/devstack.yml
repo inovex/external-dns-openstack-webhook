@@ -6,7 +6,7 @@ env:
   # renovate: datasource=git-refs depName=https://opendev.org/openstack/devstack.git extractVersion=^refs/heads/(?<version>stable/20\d{2}\.\d+)$ versioning=loose
   DEVSTACK_BRANCH: stable/2025.2
   # renovate: datasource=github-releases depName=kubernetes-sigs/external-dns
-  CI_EXTERNAL_DNS_VERSION: v0.22.0
+  CI_EXTERNAL_DNS_VERSION: v0.23.0
   OS_CLOUD: devstack-admin-demo
 
 jobs:
