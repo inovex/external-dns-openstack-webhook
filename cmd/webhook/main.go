@@ -76,5 +76,12 @@ func main() {
 	log.Debugf("Connected to OpenStack API")
 
 	log.Debugf("Starting webhook server on %s", webhookServerAddr)
-	api.StartHTTPApi(dp, startedChan, 0, 0, webhookServerAddr)
+	api.StartHTTPApi(api.ServerOptions{
+		Provider:     dp,
+		StartedChan:  startedChan,
+		ReadTimeout:  0,
+		WriteTimeout: 0,
+		ProviderPort: webhookServerAddr,
+	},
+	)
 }
