@@ -19,7 +19,7 @@ provider:
   webhook:
     image:
       repository: ghcr.io/inovex/external-dns-openstack-webhook
-      tag: 2.1.0
+      tag: 2.6.0
     extraVolumeMounts:
       - name: oscloudsyaml
         mountPath: /etc/openstack/
