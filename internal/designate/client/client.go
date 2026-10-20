@@ -20,6 +20,7 @@ package client
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -61,8 +62,8 @@ type designateClient struct {
 }
 
 // factory function for the DesignateClientInterface
-func NewDesignateClient(allProjects bool) (DesignateClientInterface, error) {
-	serviceClient, err := createDesignateServiceClient()
+func NewDesignateClient(allProjects, httpMetrics bool) (DesignateClientInterface, error) {
+	serviceClient, err := createDesignateServiceClient(httpMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func NewDesignateClient(allProjects bool) (DesignateClientInterface, error) {
 }
 
 // authenticate in OpenStack and obtain Designate service endpoint
-func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
+func createDesignateServiceClient(httpMetrics bool) (*gophercloud.ServiceClient, error) {
 	ctx := context.Background()
 
 	authOptions, endpointOptions, tlsConfig, err := clouds.Parse()
@@ -79,7 +80,18 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	}
 	authOptions.AllowReauth = true
 
-	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithTLSConfig(tlsConfig))
+	// The transport is built here, rather than through config.WithTLSConfig, so
+	// that the instrumentation also covers the Keystone authentication done
+	// inside NewProviderClient.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+	var rt http.RoundTripper = transport
+	if httpMetrics {
+		log.Info("HTTP client metrics enabled")
+		rt = metrics.HTTPClient.InstrumentTransport(rt, serviceClassifier(authOptions.IdentityEndpoint))
+	}
+
+	providerClient, err := config.NewProviderClient(ctx, authOptions, config.WithHTTPClient(http.Client{Transport: rt}))
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +100,7 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	if os.Getenv("OS_DEBUG") != "" {
 		providerClient.HTTPClient = http.Client{
 			Transport: &client.RoundTripper{
-				Rt:     &http.Transport{},
+				Rt:     rt,
 				Logger: &client.DefaultLogger{},
 			},
 		}
@@ -101,6 +113,22 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	}
 	log.Infof("Found OpenStack Designate (DNS) service at %s", client.Endpoint)
 	return client, nil
+}
+
+// serviceClassifier labels requests going to the Keystone endpoint "keystone"
+// and everything else "designate", since those are the only two services the
+// webhook talks to.
+func serviceClassifier(identityEndpoint string) func(*http.Request) string {
+	var keystoneHost string
+	if u, err := url.Parse(identityEndpoint); err == nil {
+		keystoneHost = u.Host
+	}
+	return func(r *http.Request) string {
+		if r.URL.Host == keystoneHost {
+			return "keystone"
+		}
+		return "designate"
+	}
 }
 
 // ForEachZone calls handler for each zone managed by the Designate, optionally filtered by name.

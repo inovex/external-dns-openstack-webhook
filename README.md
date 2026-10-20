@@ -60,6 +60,20 @@ kubectl create secret generic oscloudsyaml --namespace external-dns --from-file=
 The webhook provider itself logs most / all of its actions. If debugging the communication with then OpenStack (Designate) API is required one can set the environment variable.
 `OS_DEBUG=1` to have all of the API requests logged. As this might leak sensitive data, use for bug hunting only.
 
+## HTTP client metrics
+
+Start the webhook with `--http-client-metrics` to instrument the HTTP transport used towards OpenStack (Keystone authentication and Designate calls). The metrics are exposed on the status server's `/metrics` endpoint and are labelled with `service` (`keystone` or `designate`):
+
+| Metric | Labels |
+| --- | --- |
+| `external_dns_webhook_http_client_requests_total` | `service`, `code`, `method` |
+| `external_dns_webhook_http_client_request_duration_seconds` | `service`, `code`, `method` |
+| `external_dns_webhook_http_client_in_flight_requests` | `service` |
+| `external_dns_webhook_http_client_dns_duration_seconds` | `service` |
+| `external_dns_webhook_http_client_tls_duration_seconds` | `service` |
+
+The flag is off by default, in which case none of these series are emitted.
+
 ## Bugs or feature requests
 
 This webhook certainly still contains bugs or lacks certain features.
