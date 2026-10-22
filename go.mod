@@ -1,6 +1,6 @@
 module external-dns-openstack-webhook
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/gophercloud/gophercloud/v2 v2.15.0
