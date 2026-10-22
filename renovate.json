@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests"
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -19,6 +22,25 @@
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\s+extractVersion=(?<extractVersion>[^\\s]+)\\s+versioning=(?<versioning>[^\\s]+)\\n\\s*[A-Za-z0-9_]+:\\s*stable/(?<currentValue>\\d{4}\\.\\d+)"
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/goreleaser\\.dockerfile$/"
+      ],
+      "matchStrings": [
+        "FROM\\s+gcr\\.io/distroless/static-debian(?<currentValue>\\d+):\\S+"
+      ],
+      "datasourceTemplate": "custom.distroless-debian",
+      "depNameTemplate": "distroless-static",
+      "extractVersionTemplate": "debian(?<version>\\d+)",
+      "versioningTemplate": "loose"
     }
-  ]
+  ],
+  "customDatasources": {
+    "distroless-debian": {
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/GoogleContainerTools/distroless/main/distro.bzl",
+      "format": "plain"
+    }
+  }
 }
