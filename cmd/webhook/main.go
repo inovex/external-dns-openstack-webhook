@@ -23,10 +23,12 @@ const (
 func main() {
 	var domainFilters []string
 	var allProjects bool
+	var httpClientMetrics bool
 	var webhookServerAddr string
 	var statusServerAddr string
 	pflag.StringArrayVar(&domainFilters, "domain-filter", []string{}, "List of domains to work on (can be specified multiple times)")
 	pflag.BoolVar(&allProjects, "all-projects", false, "Manage all zones and recordsets regardless of the project the service user resides in (requires an admin or appropriately scoped token)")
+	pflag.BoolVar(&httpClientMetrics, "http-client-metrics", false, "Expose Prometheus metrics (request counts, durations, in-flight, DNS and TLS timings) for the HTTP calls made to OpenStack")
 	pflag.StringVar(&webhookServerAddr, "webhook-server-address", defaultWebhookServerAddr, "Address to bind the webhook server to")
 	pflag.StringVar(&statusServerAddr, "status-server-address", defaultStatusServerAddr, "Address to bind the status and metrics server to")
 	pflag.Parse()
@@ -67,7 +69,7 @@ func main() {
 	}()
 
 	epf := endpoint.NewDomainFilter(domainFilters)
-	dp, err := provider.NewDesignateProvider(*epf, allProjects, false)
+	dp, err := provider.NewDesignateProvider(*epf, allProjects, false, httpClientMetrics)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
 		metrics.OpenstackConnectionMetric.Set(0)
