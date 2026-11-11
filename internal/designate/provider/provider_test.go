@@ -401,6 +401,77 @@ out:
 	}
 }
 
+func TestDesignatePTRRecords(t *testing.T) {
+	client := newFakeDesignateClient()
+	ctx := context.TODO()
+
+	zoneID := client.AddZone(ctx, zones.Zone{
+		Name:   "116.31.10.in-addr.arpa.",
+		Type:   "PRIMARY",
+		Status: "ACTIVE",
+	})
+	rsID, _ := client.CreateRecordSet(ctx, zoneID, recordsets.CreateOpts{
+		Name:    "213.116.31.10.in-addr.arpa.",
+		Type:    endpoint.RecordTypePTR,
+		Records: []string{"gitlab.somezone.test."},
+	})
+	expected := &endpoint.Endpoint{
+		DNSName:    "213.116.31.10.in-addr.arpa",
+		RecordType: endpoint.RecordTypePTR,
+		Targets:    endpoint.Targets{"gitlab.somezone.test"},
+		Labels: map[string]string{
+			designateRecordSetID:     rsID,
+			designateZoneID:          zoneID,
+			designateOriginalRecords: "gitlab.somezone.test.",
+		},
+	}
+
+	endpoints, err := client.ToProvider().Records(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 1 || !reflect.DeepEqual(endpoints[0], expected) {
+		t.Errorf("expected %v, got %v", expected, endpoints)
+	}
+}
+
+func TestDesignateCreatePTRRecord(t *testing.T) {
+	client := newFakeDesignateClient()
+	ctx := context.TODO()
+
+	zoneID := client.AddZone(ctx, zones.Zone{
+		Name:   "116.31.10.in-addr.arpa.",
+		Type:   "PRIMARY",
+		Status: "ACTIVE",
+	})
+	endpoints := []*endpoint.Endpoint{
+		{
+			DNSName:    "213.116.31.10.in-addr.arpa",
+			RecordType: endpoint.RecordTypePTR,
+			Targets:    endpoint.Targets{"gitlab.somezone.test"},
+			Labels:     map[string]string{},
+		},
+	}
+
+	err := client.ToProvider().ApplyChanges(ctx, &plan.Changes{Create: endpoints})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []*recordsets.RecordSet
+	client.ForEachRecordSet(ctx, zoneID, func(recordSet *recordsets.RecordSet) error {
+		got = append(got, recordSet)
+		return nil
+	})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 record-set, got %d", len(got))
+	}
+	if got[0].Name != "213.116.31.10.in-addr.arpa." || got[0].Type != endpoint.RecordTypePTR ||
+		!reflect.DeepEqual(got[0].Records, []string{"gitlab.somezone.test."}) {
+		t.Errorf("unexpected record-set %s/%s -> %v", got[0].Name, got[0].Type, got[0].Records)
+	}
+}
+
 func TestDesignateCreateRecords(t *testing.T) {
 	client := newFakeDesignateClient()
 	testDesignateCreateRecords(t, client)

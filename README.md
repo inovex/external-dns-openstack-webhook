@@ -55,6 +55,12 @@ An existing file can be converted into a Secret via kubectl:
 kubectl create secret generic oscloudsyaml --namespace external-dns --from-file=clouds.yaml
 ```
 
+## Record types
+
+The webhook manages `A`, `AAAA`, `CNAME`, `TXT` and `PTR` record sets.
+For `PTR` records, configure ExternalDNS as described in its [PTR records documentation](https://kubernetes-sigs.github.io/external-dns/latest/docs/advanced/ptr-records/) and add the reverse zone (for example `116.31.10.in-addr.arpa`) to `--domain-filter`.
+The OpenStack project must own that reverse zone.
+
 ## Debugging
 
 The webhook provider itself logs most / all of its actions. If debugging the communication with then OpenStack (Designate) API is required one can set the environment variable.
