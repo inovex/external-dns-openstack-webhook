@@ -132,7 +132,8 @@ func getHostZoneID(hostname string, managedZones map[string]string) string {
 // isTypeSupported returns whether recordType is a type this provider reads back from Designate.
 func isTypeSupported(recordType string) bool {
 	switch recordType {
-	case endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME:
+	case endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeTXT, endpoint.RecordTypeCNAME,
+		endpoint.RecordTypePTR:
 		return true
 	default:
 		return false
@@ -207,7 +208,7 @@ func addEndpoint(ep *endpoint.Endpoint, recordSets map[string]*recordSet, oldEnd
 		}
 	}
 	targets := ep.Targets
-	if ep.RecordType == endpoint.RecordTypeCNAME {
+	if ep.RecordType == endpoint.RecordTypeCNAME || ep.RecordType == endpoint.RecordTypePTR {
 		targets = canonicalizeDomainNames(targets)
 	}
 	for _, t := range targets {
